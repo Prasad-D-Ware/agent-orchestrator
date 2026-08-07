@@ -19,7 +19,7 @@ type SetupMode = "lan" | "tailscale";
 // entry on purpose: the pairing QR can only ever carry the LAN address,
 // because AutopickLANIP skips utun* interfaces and rejects Tailscale's
 // 100.64.0.0/10 CGNAT range as non-private (backend/internal/mobilebridge/netiface.go).
-export function ConnectMobileSetup({ port, enabled }: ConnectMobileSetupProps) {
+export function ConnectMobileSetup({ port: _port, enabled }: ConnectMobileSetupProps) {
 	const { t } = useTranslation();
 	const [mode, setMode] = useState<SetupMode>("lan");
 
@@ -57,7 +57,7 @@ export function ConnectMobileSetup({ port, enabled }: ConnectMobileSetupProps) {
 							<span className="tracking-settings-mono text-settings-label">tailscale ip -4</span>{" "}
 							{t("mobile.tailscale.step2Trail")}
 						</li>
-						<li>{t("mobile.tailscale.step3", { port })}</li>
+						<li>{t("mobile.tailscale.step3")}</li>
 					</ol>
 				</div>
 			)}
