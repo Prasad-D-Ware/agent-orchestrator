@@ -5395,11 +5395,14 @@ components:
           type: string
         port:
           type: integer
+        tailscaleHost:
+          type: string
         warning:
           type: string
       required:
       - enabled
       - host
+      - tailscaleHost
       - port
       - password
       - warning

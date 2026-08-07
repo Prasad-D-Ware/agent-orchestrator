@@ -83,9 +83,27 @@ type BridgeService struct {
 	LAN         LANController
 	ConfigPath  string
 	DefaultPort int
+	// PickLANHost and PickTailscaleHost resolve the advertised addresses. Both
+	// are nil in production (daemon.go) and fall back to the real autopickers;
+	// tests inject stubs so status output does not depend on the host machine's
+	// real network interfaces.
+	PickLANHost       func() string
+	PickTailscaleHost func() string
 }
 
-func (b *BridgeService) currentHost() string { return mobilebridge.AutopickLANIP() }
+func (b *BridgeService) currentHost() string {
+	if b.PickLANHost != nil {
+		return b.PickLANHost()
+	}
+	return mobilebridge.AutopickLANIP()
+}
+
+func (b *BridgeService) currentTailscaleHost() string {
+	if b.PickTailscaleHost != nil {
+		return b.PickTailscaleHost()
+	}
+	return mobilebridge.AutopickTailscaleIP()
+}
 
 // Status reports the current bridge state, host, and port. The plaintext
 // password is included only while the bridge is enabled (loopback route only).
@@ -93,10 +111,11 @@ func (b *BridgeService) Status() MobileStatusResponse {
 	st, _ := mobilebridge.Load(b.ConfigPath)
 	enabled := st.Enabled && b.LAN.Running()
 	res := MobileStatusResponse{
-		Enabled: enabled,
-		Host:    b.currentHost(),
-		Port:    b.LAN.BoundPort(),
-		Warning: mobileUnencryptedWarning,
+		Enabled:       enabled,
+		Host:          b.currentHost(),
+		TailscaleHost: b.currentTailscaleHost(),
+		Port:          b.LAN.BoundPort(),
+		Warning:       mobileUnencryptedWarning,
 	}
 	// Only surface the password while the bridge is actually enabled. This route
 	// is reachable only on the loopback listener (the LAN listener 404s

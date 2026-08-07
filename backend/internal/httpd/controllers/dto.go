@@ -1005,11 +1005,15 @@ type ResolveCommentsResponse struct {
 // regenerate endpoints. Password is populated only transiently, on enable and
 // regenerate responses (empty otherwise) — it is never persisted in plaintext.
 type MobileStatusResponse struct {
-	Enabled  bool   `json:"enabled"`
-	Host     string `json:"host"`
-	Port     int    `json:"port"`
-	Password string `json:"password"`
-	Warning  string `json:"warning"`
+	Enabled bool   `json:"enabled"`
+	Host    string `json:"host"`
+	// TailscaleHost is this machine's 100.64.0.0/10 Tailscale address, or "" when
+	// Tailscale is not up. The renderer encodes it into the pairing QR when the
+	// user selects the Tailscale tab, and shows a hint instead when it is empty.
+	TailscaleHost string `json:"tailscaleHost"`
+	Port          int    `json:"port"`
+	Password      string `json:"password"`
+	Warning       string `json:"warning"`
 }
 
 // PushDeviceTokenParam is the {token} path parameter for push-device routes.

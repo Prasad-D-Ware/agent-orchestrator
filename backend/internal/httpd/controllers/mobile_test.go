@@ -86,3 +86,62 @@ func TestMobileEnableReturnsPassword(t *testing.T) {
 		t.Fatalf("bad response: %+v", got)
 	}
 }
+
+// Status must advertise both addresses so the renderer's LAN/Tailscale toggle
+// can re-encode the pairing QR without a second round trip.
+func TestMobileStatusSurfacesBothHosts(t *testing.T) {
+	lan := &fakeLAN{running: true}
+	b := &BridgeService{
+		LAN:               lan,
+		ConfigPath:        filepath.Join(t.TempDir(), "mobile", "config.json"),
+		DefaultPort:       3011,
+		PickLANHost:       func() string { return "192.168.1.42" },
+		PickTailscaleHost: func() string { return "100.72.46.7" },
+	}
+	if _, err := b.Enable(); err != nil {
+		t.Fatalf("enable: %v", err)
+	}
+
+	got := b.Status()
+	if got.Host != "192.168.1.42" {
+		t.Errorf("Host = %q want 192.168.1.42", got.Host)
+	}
+	if got.TailscaleHost != "100.72.46.7" {
+		t.Errorf("TailscaleHost = %q want 100.72.46.7", got.TailscaleHost)
+	}
+}
+
+// An absent Tailscale install is an empty string, not an error: the renderer
+// uses "" to decide to show a hint instead of an unscannable QR.
+func TestMobileStatusTailscaleHostEmptyWhenAbsent(t *testing.T) {
+	b := &BridgeService{
+		LAN:               &fakeLAN{running: true},
+		ConfigPath:        filepath.Join(t.TempDir(), "mobile", "config.json"),
+		DefaultPort:       3011,
+		PickLANHost:       func() string { return "192.168.1.42" },
+		PickTailscaleHost: func() string { return "" },
+	}
+	if _, err := b.Enable(); err != nil {
+		t.Fatalf("enable: %v", err)
+	}
+	if got := b.Status().TailscaleHost; got != "" {
+		t.Errorf("TailscaleHost = %q want empty", got)
+	}
+}
+
+// Unset pickers must fall back to the real autopickers rather than panicking on
+// a nil func — production wiring in daemon.go leaves them unset. This also
+// proves the call actually completed (not just "didn't panic"): the real
+// AutopickLANIP/AutopickTailscaleIP paths run, and Port still comes through
+// from the LAN controller untouched by that fallback.
+func TestMobileStatusHostPickersDefaultWhenUnset(t *testing.T) {
+	b := &BridgeService{
+		LAN:         &fakeLAN{running: true},
+		ConfigPath:  filepath.Join(t.TempDir(), "mobile", "config.json"),
+		DefaultPort: 3011,
+	}
+	got := b.Status()
+	if got.Port != 3011 {
+		t.Errorf("Port = %d want 3011", got.Port)
+	}
+}

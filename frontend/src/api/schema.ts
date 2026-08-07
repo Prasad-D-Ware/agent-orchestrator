@@ -1835,6 +1835,7 @@ export interface components {
             host: string;
             password: string;
             port: number;
+            tailscaleHost: string;
             warning: string;
         };
         NotificationEnvelope: {
