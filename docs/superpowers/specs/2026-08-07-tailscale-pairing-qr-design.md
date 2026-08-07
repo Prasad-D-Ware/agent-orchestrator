@@ -148,9 +148,23 @@ a stale selection.
 address, port {{port}}, and the password below. Leave Use TLS off." That
 instruction is now wrong — it becomes "Scan the code below."
 
-The two new hint strings and the rewritten step need `zh-CN` entries.
-`frontend/src/renderer/i18n/renderer-coverage.test.ts` enforces key parity and
-will fail without them.
+The two new hint strings and the rewritten step need entries in **all seven**
+non-English locales: `de`, `es`, `fr`, `ja`, `ko`, `pt-BR`, `zh-CN`.
+
+The enforcing test is `frontend/src/renderer/i18n/instance.test.ts`, not
+`renderer-coverage.test.ts` (which only bans hardcoded English JSX). Two
+assertions apply:
+
+- `"keeps locale catalogs covering every English key with non-empty values"`
+  (line 149) — every locale must define every `en` key, non-empty.
+- `"keeps interpolation variables aligned between locales"` (line 162) — the
+  `{{var}}` set must match `en` exactly, per key.
+
+The second constrains the rewrite: the current `mobile.tailscale.step3` carries
+`{{port}}`, and the new "scan the code below" copy does not. Once `en` drops it,
+every locale must drop it too. The `port` prop on `ConnectMobileSetup` then has
+no remaining consumer and is removed, along with `port={status.port}` at its
+single call site.
 
 ### Mobile
 
@@ -165,6 +179,10 @@ is a `100.x` instead of a `192.168.x`.
   down → skipped; no interfaces → `""`.
 - Controller test — `Status()` surfaces `tailscaleHost`, and the LAN listener
   still 404s `/api/v1/mobile/status` (existing assertion, must keep passing).
+  `BridgeService.currentHost()` calls the real `AutopickLANIP()` today, which
+  makes address output untestable; the two pickers become injectable
+  `func() string` fields defaulting to the real ones, mirroring the `LookPath`
+  injection already used in `session_manager` and `cli/doctor`.
 - `ConnectMobileModal.test.tsx` — flipping the toggle changes the QR's `value`
   prop; an empty active host renders the hint and no QR; the address line tracks
   the mode.
