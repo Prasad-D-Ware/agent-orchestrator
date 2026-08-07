@@ -7,7 +7,7 @@ import { apiClient, apiErrorMessage } from "../lib/api-client";
 import { captureRendererEvent } from "../lib/telemetry";
 import { cn } from "../lib/utils";
 import { ConnectMobileGetApp } from "./settings/ConnectMobileGetApp";
-import { ConnectMobileSetup } from "./settings/ConnectMobileSetup";
+import { ConnectMobileSetup, type SetupMode } from "./settings/ConnectMobileSetup";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { Switch } from "./ui/switch";
@@ -20,6 +20,7 @@ const QR_CODE_SIZE = 204;
 interface MobileStatus {
 	enabled: boolean;
 	host: string;
+	tailscaleHost: string;
 	port: number;
 	password: string;
 	warning: string;
@@ -55,6 +56,7 @@ export function ConnectMobileModal({ open, onOpenChange }: ConnectMobileModalPro
 	const queryClient = useQueryClient();
 	const [copied, setCopied] = useState(false);
 	const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const [mode, setMode] = useState<SetupMode>("lan");
 
 	useEffect(() => {
 		return () => {
@@ -76,6 +78,7 @@ export function ConnectMobileModal({ open, onOpenChange }: ConnectMobileModalPro
 	useEffect(() => {
 		if (!open) {
 			reportedOpen.current = false;
+			setMode("lan");
 			return;
 		}
 		if (initialEnabled === undefined || reportedOpen.current) return;
@@ -116,6 +119,10 @@ export function ConnectMobileModal({ open, onOpenChange }: ConnectMobileModalPro
 
 	const status = query.data;
 	const enabled = status?.enabled ?? false;
+	// The QR encodes whichever address matches the selected tab. Either can be
+	// empty — no LAN interface, or Tailscale not running — and an empty host
+	// would otherwise produce a QR the phone rejects outright.
+	const activeHost = mode === "tailscale" ? (status?.tailscaleHost ?? "") : (status?.host ?? "");
 	const busy = enable.isPending || disable.isPending || regenerate.isPending;
 
 	const clearActionErrors = () => {
@@ -245,17 +252,28 @@ export function ConnectMobileModal({ open, onOpenChange }: ConnectMobileModalPro
 									>
 										{/* Steps sit above the QR so the LAN/Tailscale choice is on screen
 										    the moment the bridge turns on, with no scrolling. */}
-										<ConnectMobileSetup port={status.port} enabled={enabled} />
+										<ConnectMobileSetup mode={mode} onModeChange={setMode} enabled={enabled} />
 
 										<div className="mt-6 flex w-(--size-settings-mobile-qr) flex-col items-center">
-											<div className="rounded-(--radius-settings-dialog-lg) bg-white p-2 shadow-[var(--shadow-settings-qr)]">
-												<QRCodeSVG
-													value={pairingPayload(status.host, status.port, status.password)}
-													size={QR_CODE_SIZE}
-													className="block size-(--size-settings-mobile-qr-code)"
-												/>
-											</div>
-											<p className="mt-4 text-sm leading-5 text-settings-muted">{t("mobile.scanToPair")}</p>
+											{activeHost ? (
+												<>
+													<div className="rounded-(--radius-settings-dialog-lg) bg-white p-2 shadow-[var(--shadow-settings-qr)]">
+														<QRCodeSVG
+															value={pairingPayload(activeHost, status.port, status.password)}
+															data-qr-value={pairingPayload(activeHost, status.port, status.password)}
+															size={QR_CODE_SIZE}
+															className="block size-(--size-settings-mobile-qr-code)"
+														/>
+													</div>
+													<p className="mt-4 text-sm leading-5 text-settings-muted">{t("mobile.scanToPair")}</p>
+												</>
+											) : (
+												<div className="flex size-(--size-settings-mobile-qr-code) items-center justify-center rounded-(--radius-settings-dialog-lg) border border-[var(--color-border-settings-input)] bg-[var(--color-bg-settings-input)] p-4">
+													<p className="text-center text-caption leading-(--leading-settings-mobile-hint) text-settings-muted">
+														{mode === "tailscale" ? t("mobile.noTailscaleHost") : t("mobile.noPairingHost")}
+													</p>
+												</div>
+											)}
 										</div>
 
 										{status.warning && (
@@ -266,10 +284,10 @@ export function ConnectMobileModal({ open, onOpenChange }: ConnectMobileModalPro
 										)}
 
 										<div className="mt-6 flex w-full flex-col gap-1 px-(--size-settings-mobile-details-pad-x)">
-											<div className="flex items-center gap-6 text-sm leading-5">
+											<div className="flex items-center gap-6 text-sm leading-5" data-testid="mobile-pairing-address">
 												<span className="w-(--size-settings-mobile-label) shrink-0 text-settings-muted">{t("mobile.address")}</span>
 												<span className="tracking-settings-mono text-settings-label">
-													{status.host}:{status.port}
+													{activeHost ? `${activeHost}:${status.port}` : "—"}
 												</span>
 											</div>
 											<div className="flex items-center gap-6 text-sm leading-5">

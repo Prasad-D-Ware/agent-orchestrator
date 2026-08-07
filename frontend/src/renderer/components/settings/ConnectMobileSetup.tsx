@@ -1,10 +1,13 @@
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { RadioGroup } from "radix-ui";
 
+export type SetupMode = "lan" | "tailscale";
+
 interface ConnectMobileSetupProps {
-	/** Live bridge port, echoed in the Tailscale manual-entry step. */
-	port: number;
+	/** The selected connection method. Owned by the modal, which encodes the
+	 *  matching address into the pairing QR. */
+	mode: SetupMode;
+	onModeChange: (mode: SetupMode) => void;
 	/**
 	 * False while the bridge is off; the steps are then collapsed, so their
 	 * controls must leave the tab order (same pattern as the pairing block).
@@ -12,23 +15,20 @@ interface ConnectMobileSetupProps {
 	enabled: boolean;
 }
 
-type SetupMode = "lan" | "tailscale";
-
-// ConnectMobileSetup tells the user what to do with the pairing QR above it.
-// The LAN mode is the happy path (scan and go). The Tailscale mode is manual
-// entry on purpose: the pairing QR can only ever carry the LAN address,
-// because AutopickLANIP skips utun* interfaces and rejects Tailscale's
-// 100.64.0.0/10 CGNAT range as non-private (backend/internal/mobilebridge/netiface.go).
-export function ConnectMobileSetup({ port: _port, enabled }: ConnectMobileSetupProps) {
+// ConnectMobileSetup tells the user what to do with the pairing QR above it and
+// which address that QR carries. The mode is owned by ConnectMobileModal so the
+// QR can re-encode: LAN mode encodes the private IPv4 from AutopickLANIP, and
+// Tailscale mode encodes the 100.64.0.0/10 address from AutopickTailscaleIP
+// (backend/internal/mobilebridge/netiface.go).
+export function ConnectMobileSetup({ mode, onModeChange, enabled }: ConnectMobileSetupProps) {
 	const { t } = useTranslation();
-	const [mode, setMode] = useState<SetupMode>("lan");
 
 	// Margin-free on purpose: the modal owns the spacing around this block.
 	return (
 		<div className="flex w-full flex-col items-center">
 			<RadioGroup.Root
 				value={mode}
-				onValueChange={(value) => setMode(value as SetupMode)}
+				onValueChange={(value) => onModeChange(value as SetupMode)}
 				aria-label={t("mobile.connectionMethod")}
 				className="settings-segment"
 			>
