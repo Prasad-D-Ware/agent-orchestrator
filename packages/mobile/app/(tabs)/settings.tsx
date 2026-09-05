@@ -3,8 +3,7 @@ import Constants from "expo-constants";
 import { useFocusEffect, useRouter } from "expo-router";
 import * as Updates from "expo-updates";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { ApiError, pingServer } from "../../lib/api";
 import { bugReportBody, formatVersionLine, type BuildInfo } from "../../lib/appInfo";
 import { DEFAULT_CONFIG, isConfigured, loadConfig, type ServerConfig } from "../../lib/config";
@@ -23,7 +22,8 @@ import { checkAndDownload, describeUpdateRow, type UpdateOutcome } from "../../l
 import { describeStoreRow, floorSignal, storeRowResult, tierOf, type StoreCheck, type StoreRowResult } from "../../lib/storeUpdate";
 import { VERSION_FLOOR } from "../../lib/versionFloor";
 import { useTabScrollToTop } from "../../lib/useTabScrollToTop";
-import { Dot, ScreenHeader, SettingsGroup, SettingsRow, SettingsToggle } from "../../lib/ui";
+import { NativeHeaderButton } from "../../lib/native-header-button";
+import { Dot, SettingsGroup, SettingsRow, SettingsToggle } from "../../lib/ui";
 import { useTheme, useThemedStyles, useThemeState } from "../../lib/ThemeProvider";
 import { activeProjectLabel } from "../../lib/projectFilter";
 
@@ -32,7 +32,6 @@ const ISSUES_URL = "https://github.com/AgentWrapper/agent-orchestrator/issues/ne
 export default function SettingsScreen() {
 	const t = useTheme();
 	const styles = useThemedStyles(makeStyles);
-	const insets = useSafeAreaInsets();
 	const router = useRouter();
 	const { reloadConfig, projects, projectsKnown, connection, activeProjectId, setActiveProject } = useApp();
 	const scrollRef = useTabScrollToTop<ScrollView>();
@@ -64,17 +63,20 @@ export default function SettingsScreen() {
 	const paired = isConfigured(cfg);
 
 	return (
-		<View style={styles.screen}>
-			<View style={{ height: insets.top }} />
-			<ScreenHeader title="Settings" status={connection} />
+		<View style={styles.screen} collapsable={false}>
 			<ScrollView
 				ref={scrollRef}
-				contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
+				contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 80 }}
 				keyboardShouldPersistTaps="handled"
 			>
+				<View style={styles.sheetHeader} collapsable={false}>
+					<NativeHeaderButton icon="close" label="Close settings" onPress={() => router.back()} />
+					<Text style={styles.sheetTitle}>Settings</Text>
+					<View style={styles.headerBalance} />
+				</View>
 				<ConnectionSection cfg={cfg} paired={paired} connection={connection} />
 
-				<SettingsGroup title="Projects" footer="Scopes the Agents and PRs tabs.">
+				<SettingsGroup title="Projects" footer="Scopes Pull Requests.">
 					<SettingsRow
 						icon="folder"
 						label="Active project"
@@ -419,6 +421,17 @@ function StoreUpdateRow() {
 
 const makeStyles = (t: Theme) =>
 	StyleSheet.create({
-	screen: { flex: 1, backgroundColor: t.bgBase },
-	center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: t.bgBase },
-});
+		screen: { flex: 1, backgroundColor: t.bgSurface },
+		center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: t.bgSurface },
+		sheetHeader: {
+			minHeight: 64,
+			marginHorizontal: -16,
+			paddingLeft: 0,
+			paddingRight: 16,
+			flexDirection: "row",
+			alignItems: "center",
+			justifyContent: "space-between",
+		},
+		sheetTitle: { color: t.textPrimary, fontSize: 18, lineHeight: 24, fontWeight: "700" },
+		headerBalance: { width: 44, height: 44 },
+	});

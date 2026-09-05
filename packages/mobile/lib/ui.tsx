@@ -14,6 +14,8 @@ import {
 	type ViewStyle,
 } from "react-native";
 import { haptics } from "./haptics";
+import { NativeHeaderButton, type NativeHeaderButtonIcon } from "./native-header-button";
+import { useSidebarNavigation } from "./sidebar-navigation-shell";
 import type { ConnStatus } from "./store";
 import { statusVisual, type Theme } from "./theme";
 import { useTheme, useThemedStyles } from "./ThemeProvider";
@@ -181,28 +183,26 @@ export function HeaderIconButton({
 	onPress,
 	badge = 0,
 }: {
-	icon: keyof typeof Feather.glyphMap;
+	icon: NativeHeaderButtonIcon;
 	/** Required — the control has no visible text. */
 	label: string;
 	onPress: () => void;
 	/** Non-zero shows an unread dot. The number itself is not drawn. */
 	badge?: number;
 }) {
-	const t = useTheme();
 	const s = useThemedStyles(makeStyles);
 	return (
-		<Pressable
-			hitSlop={10}
-			accessibilityLabel={badge > 0 ? `${label}, ${badge} unread` : label}
-			onPress={() => {
-				haptics.tap();
-				onPress();
-			}}
-			style={({ pressed }) => [s.headerIconBtn, pressed && { opacity: 0.6 }]}
-		>
-			<Feather name={icon} size={21} color={t.textSecondary} />
+		<View style={s.headerIconBtn} accessibilityLabel={badge > 0 ? `${label}, ${badge} unread` : label}>
+			<NativeHeaderButton
+				icon={icon}
+				label={badge > 0 ? `${label}, ${badge} unread` : label}
+				onPress={() => {
+					haptics.tap();
+					onPress();
+				}}
+			/>
 			{badge > 0 ? <View style={s.headerBadge} /> : null}
-		</Pressable>
+		</View>
 	);
 }
 
@@ -251,8 +251,10 @@ export function ScreenHeader({
 	status?: ConnStatus;
 }) {
 	const s = useThemedStyles(makeStyles);
+	const { openSidebar } = useSidebarNavigation();
 	return (
 		<View style={s.screenHeader}>
+			<HeaderIconButton icon="menu" label="Open navigation" onPress={openSidebar} />
 			<View style={{ flex: 1 }}>
 				<View style={s.titleRow}>
 					<Text style={s.screenTitle}>{title}</Text>

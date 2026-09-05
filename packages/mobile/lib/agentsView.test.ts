@@ -8,6 +8,7 @@ import {
 	prLine,
 	showBranch,
 	trackerIssueId,
+	workerRowPresentation,
 	zoneMeta,
 } from "./agentsView";
 import { darkTheme, lightTheme } from "./theme";
@@ -153,6 +154,55 @@ describe("groupSessions", () => {
 
 	it("returns nothing for an empty board", () => {
 		expect(groupSessions(darkTheme, [])).toEqual({ sections: [], archived: [] });
+	});
+});
+
+describe("workerRowPresentation", () => {
+	it("uses a live status for active work and keeps branch and project metadata compact", () => {
+		const row = workerRowPresentation(
+			darkTheme,
+			session({
+				id: "worker-7",
+				status: "working",
+				displayName: "Make remote coding feel local",
+				branch: "feat/remote-command-center",
+				lastActivityAt: "2026-09-02T10:55:00Z",
+			}),
+			"Moonbase Terminal",
+			Date.parse("2026-09-02T11:00:00Z"),
+		);
+
+		expect(row).toEqual({
+			title: "Make remote coding feel local",
+			project: "Moonbase Terminal",
+			branch: "feat/remote-command-center",
+			trailing: "Working",
+			trailingKind: "status",
+		});
+	});
+
+	it("uses elapsed time for an idle worker and falls back to the compact project id", () => {
+		const row = workerRowPresentation(
+			darkTheme,
+			session({
+				id: "worker-8",
+				projectId: "agent-orchestrator-mobile_98d163a851",
+				status: "idle",
+				displayName: "Polish the handoff",
+				branch: null,
+				lastActivityAt: "2026-09-02T10:18:00Z",
+			}),
+			undefined,
+			Date.parse("2026-09-02T11:00:00Z"),
+		);
+
+		expect(row).toEqual({
+			title: "Polish the handoff",
+			project: "agent-orch…8d163a851",
+			branch: null,
+			trailing: "42m",
+			trailingKind: "time",
+		});
 	});
 });
 

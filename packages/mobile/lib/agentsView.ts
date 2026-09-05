@@ -6,9 +6,10 @@
 // and lib/session-presentation.ts) so the two speak the same language: same
 // zone names, same archive rule, same "PR #12, #13 open" phrasing.
 import type { DashboardPR, DashboardSession } from "./api";
+import { relativeTime } from "./notificationView";
 import { prLifecycle, type Tone } from "./prView";
-import { attentionOf } from "./sessionStatus";
-import type { Theme } from "./theme";
+import { attentionOf, sessionTitle } from "./sessionStatus";
+import { statusVisual, type Theme } from "./theme";
 
 /** The four board columns, as desktop names them. */
 export type BoardZone = "working" | "action" | "pending" | "merge";
@@ -71,6 +72,50 @@ export function isArchived(session: DashboardSession): boolean {
 }
 
 export type BoardSection = { zone: BoardZone; label: string; color: string; data: DashboardSession[] };
+
+export type WorkerRowPresentation = {
+	title: string;
+	project: string;
+	branch: string | null;
+	trailing: string;
+	trailingKind: "status" | "time";
+};
+
+function compactProjectLabel(value: string, max = 20): string {
+	if (value.length <= max) return value;
+	const keep = max - 1;
+	const head = Math.ceil(keep / 2);
+	const tail = Math.floor(keep / 2);
+	return `${value.slice(0, head)}…${value.slice(value.length - tail)}`;
+}
+
+/**
+ * The compact identity and state shown by the Workers list.
+ *
+ * Active states earn a semantic label. Quiet states use the last-activity age
+ * instead, because repeating "Idle" down an entire section adds less context
+ * than showing which worker changed most recently.
+ */
+export function workerRowPresentation(
+	t: Theme,
+	session: DashboardSession,
+	projectName?: string,
+	now: number = Date.now(),
+): WorkerRowPresentation {
+	const title = sessionTitle(session);
+	const visual = statusVisual(t, session.status);
+	const elapsedStatuses = new Set(["idle", "no_signal", "unknown", "done", "killed", "terminated"]);
+	const elapsed = relativeTime(session.lastActivityAt, now);
+	const useElapsed = elapsedStatuses.has(session.status ?? "") && Boolean(elapsed);
+
+	return {
+		title,
+		project: projectName?.trim() || compactProjectLabel(session.projectId),
+		branch: showBranch(session.branch, title) ? session.branch : null,
+		trailing: useElapsed ? elapsed : visual.label,
+		trailingKind: useElapsed ? "time" : "status",
+	};
+}
 
 function comparePinned(a: DashboardSession, b: DashboardSession): number {
 	return Number(Boolean(b.isPinned)) - Number(Boolean(a.isPinned));

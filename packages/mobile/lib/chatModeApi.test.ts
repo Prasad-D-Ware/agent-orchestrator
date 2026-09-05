@@ -82,6 +82,29 @@ describe("mobile Chat API boundaries", () => {
 		expect(session).toMatchObject({ id: "w-2", projectId: "p-1", mode: "chat" });
 	});
 
+	it("forwards picked files as delegated worker attachments", async () => {
+		vi.mocked(fetch)
+			.mockResolvedValueOnce(response({ ok: true, workerId: "w-3" }, 202))
+			.mockResolvedValueOnce(response({ session: { id: "w-3", projectId: "p-1", harness: "codex", mode: "chat" } }));
+
+		await delegateTask(cfg, {
+			projectId: "p-1",
+			brief: "Review this file",
+			agent: "codex",
+			mode: "chat",
+			attachments: [{ mimeType: "text/plain", data: "aGVsbG8=" }],
+		});
+
+		const [, init] = vi.mocked(fetch).mock.calls[0];
+		expect(JSON.parse(String(init?.body))).toEqual({
+			projectId: "p-1",
+			brief: "Review this file",
+			agent: "codex",
+			mode: "chat",
+			attachments: [{ mimeType: "text/plain", data: "aGVsbG8=" }],
+		});
+	});
+
 	it("keeps an explicit TUI orchestrator request explicit", async () => {
 		vi.mocked(fetch).mockResolvedValue(response({ orchestrator: { id: "o-1", projectId: "p-1", mode: "tui" } }, 201));
 		const orchestrator = await launchOrchestrator(cfg, "p-1", true, "tui");
