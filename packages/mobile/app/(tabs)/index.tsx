@@ -1,7 +1,8 @@
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Keyboard, LayoutAnimation, Platform, Pressable, RefreshControl, SectionList, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Alert, Keyboard, Platform, Pressable, RefreshControl, SectionList, StyleSheet, Text, View } from "react-native";
+import { useKeyboardState } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { DashboardSession } from "../../lib/api";
 import { classifyConnectionFailure, describeConnectionFailure } from "../../lib/connectionError";
@@ -17,7 +18,7 @@ import { useTheme, useThemedStyles } from "../../lib/ThemeProvider";
 import { useTabScrollToTop } from "../../lib/useTabScrollToTop";
 import { Button, EmptyState, HeaderIconButton, ListSectionHeader, ScreenHeader } from "../../lib/ui";
 import { WorkerDock } from "../../lib/worker-dock";
-import { keyboardOverlap, workerDockKeyboardLayout, workerListBottomInset } from "../../lib/worker-dock-layout";
+import { workerDockKeyboardLayout, workerListBottomInset } from "../../lib/worker-dock-layout";
 import { WorkerControlsSheet } from "../../lib/worker-controls-sheet";
 import {
 	ALL_WORKER_PROJECTS,
@@ -43,7 +44,6 @@ export default function FleetScreen() {
 	const styles = useThemedStyles(makeStyles);
 	const router = useRouter();
 	const insets = useSafeAreaInsets();
-	const { height: windowHeight } = useWindowDimensions();
 	const { configured, loading, error, errorStatus, connection, config, refresh, sessions, projects, notificationsUnread, activeEndpoints, kill, renameWorker, setWorkerPinned } =
 		useApp();
 	const [refreshing, setRefreshing] = useState(false);
@@ -51,8 +51,15 @@ export default function FleetScreen() {
 	const [searchRequested, setSearchRequested] = useState(false);
 	const [controlsOpen, setControlsOpen] = useState(false);
 	const [workerProjectId, setWorkerProjectId] = useState(ALL_WORKER_PROJECTS);
-	const [keyboardHeight, setKeyboardHeight] = useState(0);
-	const [keyboardVisible, setKeyboardVisible] = useState(false);
+	// Two selectors rather than the whole state object, so the board re-renders
+	// only when one of these two values actually changes.
+	//
+	// The hook listens on keyboardWillShow / keyboardDidHide — `will`, not `did`.
+	// That is the fix: the Android branch this replaces listened for
+	// keyboardDidShow, which fires only once the IME has finished animating, so
+	// the dock and the list inset arrived a beat after the keyboard had landed.
+	const keyboardHeight = useKeyboardState((state) => state.height);
+	const keyboardVisible = useKeyboardState((state) => state.isVisible);
 	const [renamingWorkerId, setRenamingWorkerId] = useState<string>();
 	const [activeSwipeId, setActiveSwipeId] = useState<string>();
 	const activeSwipeRef = useRef<{ id: string; close(): void } | undefined>(undefined);
@@ -179,48 +186,6 @@ export default function FleetScreen() {
 			],
 		);
 	}, [kill]);
-
-	useEffect(() => {
-		if (Platform.OS === "ios") {
-			const updateFromFrame = (event: Parameters<typeof Keyboard.scheduleLayoutAnimation>[0]) => {
-				setKeyboardVisible(event.endCoordinates.height > 0 && event.endCoordinates.screenY < windowHeight);
-				setKeyboardHeight(
-					keyboardOverlap(windowHeight, event.endCoordinates.screenY, event.endCoordinates.height),
-				);
-			};
-			const willChange = Keyboard.addListener("keyboardWillChangeFrame", (event) => {
-				Keyboard.scheduleLayoutAnimation(event);
-				updateFromFrame(event);
-			});
-			const didChange = Keyboard.addListener("keyboardDidChangeFrame", updateFromFrame);
-			const didHide = Keyboard.addListener("keyboardDidHide", () => { setKeyboardVisible(false); setKeyboardHeight(0); });
-			return () => {
-				willChange.remove();
-				didChange.remove();
-				didHide.remove();
-			};
-		}
-
-		const animate = (duration?: number) =>
-			LayoutAnimation.configureNext({
-				duration: duration || 250,
-				update: { type: LayoutAnimation.Types.keyboard },
-			});
-		const show = Keyboard.addListener("keyboardDidShow", (event) => {
-			animate(event.duration);
-			setKeyboardVisible(true);
-			setKeyboardHeight(keyboardOverlap(windowHeight, event.endCoordinates.screenY, event.endCoordinates.height));
-		});
-		const hide = Keyboard.addListener("keyboardDidHide", (event) => {
-			animate(event?.duration);
-			setKeyboardVisible(false);
-			setKeyboardHeight(0);
-		});
-		return () => {
-			show.remove();
-			hide.remove();
-		};
-	}, [windowHeight]);
 
 	const keyboardLayout = workerDockKeyboardLayout(keyboardHeight, insets.bottom, keyboardVisible);
 
