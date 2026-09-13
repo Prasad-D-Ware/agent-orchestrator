@@ -76,6 +76,32 @@ export const type = {
 	eyebrow: { fontSize: 11, fontWeight: "700", letterSpacing: 1.2 },
 } as const;
 
+/**
+ * How far each kind of text may grow under Dynamic Type / font scale.
+ *
+ * Uncapped text breaks this app specifically: the worker dock is a fixed 52pt,
+ * list rows are fixed heights, and chips and eyebrows are laid out expecting one
+ * line. At the largest accessibility sizes those clip rather than reflow.
+ *
+ * Capping is per-component on purpose. `Text.defaultProps` is the usual global
+ * escape hatch, but React 19 removed it for function components, so a global
+ * default would be a silent no-op.
+ *
+ * The ceiling rises as the text's job gets more important: chrome must stay on
+ * its line, a screen title can afford some growth, and body copy — the text
+ * someone enabled large type in order to *read* — grows the most. Nothing is
+ * capped below 1.3, because a cap tight enough to defeat the setting is worse
+ * than a layout that bends.
+ */
+export const fontScaleCap = {
+	/** Chips, badges, pills, eyebrows, row values — dense, single-line. */
+	chrome: 1.3,
+	/** Screen and sheet titles. */
+	title: 1.4,
+	/** Body copy, buttons, settings labels, empty states. */
+	body: 1.6,
+} as const;
+
 export type SpaceToken = keyof typeof space;
 export type RadiusToken = keyof typeof radius;
 export type TypeToken = keyof typeof type;

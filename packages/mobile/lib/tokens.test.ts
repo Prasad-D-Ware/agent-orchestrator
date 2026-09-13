@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { radius, space, type } from "./tokens";
+import { fontScaleCap, radius, space, type } from "./tokens";
 
 // These tests are a regression fence, not a description of taste. A scale that
 // stops ascending has been edited carelessly, and the anchors below are the
@@ -28,6 +28,21 @@ describe("radius scale", () => {
 
 	it("keeps the card radius at the value cardShell already uses", () => {
 		expect(radius.md).toBe(12);
+	});
+});
+
+describe("font scale caps", () => {
+	it("lets text grow more as its job gets more important", () => {
+		expect(fontScaleCap.chrome).toBeLessThan(fontScaleCap.title);
+		expect(fontScaleCap.title).toBeLessThan(fontScaleCap.body);
+	});
+
+	// A cap tight enough to defeat the accessibility setting is worse than a
+	// layout that bends, so nothing may be capped below 1.3.
+	it("never caps so tightly that large type stops working", () => {
+		for (const cap of Object.values(fontScaleCap)) {
+			expect(cap).toBeGreaterThanOrEqual(1.3);
+		}
 	});
 });
 
