@@ -231,7 +231,7 @@ Set `accessibilityRole="button"`, the exact derived label, and a minimum 76-poin
 
 - [ ] **Step 5: Run focused tests and typecheck**
 
-Run: `cd packages/mobile && npm test -- lib/orchestratorView.test.ts && npm run typecheck`  
+Run: `cd packages/mobile && npm test -- lib/orchestratorView.test.ts && npm run typecheck`
 Expected: PASS.
 
 - [ ] **Step 6: Review the focused diff**
