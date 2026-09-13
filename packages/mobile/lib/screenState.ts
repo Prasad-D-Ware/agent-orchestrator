@@ -85,6 +85,24 @@ export function screenStateFor({
 	return { kind: "ready" };
 }
 
+/**
+ * How old the data is, for a banner that has to say so in a few characters.
+ *
+ * Uses the same m/h/d vocabulary as relativeTime so the banner and the
+ * timestamps in the rows beneath it do not disagree about how time is spelled.
+ * Below a minute it says "moments" rather than "0m", because a banner claiming
+ * zero age while telling you the data is stale reads as a bug.
+ */
+export function staleAgeLabel(ageMs: number): string {
+	const secs = Math.max(0, Math.round(ageMs / 1000));
+	if (secs < 60) return "moments ago";
+	const mins = Math.floor(secs / 60);
+	if (mins < 60) return `${mins}m ago`;
+	const hours = Math.floor(mins / 60);
+	if (hours < 24) return `${hours}h ago`;
+	return `${Math.floor(hours / 24)}d ago`;
+}
+
 /** Whether the screen should render its list at all. */
 export function showsList(state: ScreenState): boolean {
 	return state.kind === "ready" || state.kind === "stale";

@@ -312,7 +312,7 @@ export function ScreenHeader({
 	);
 }
 
-export function ListSectionHeader({ label }: { label: string }) {
+export function ListSectionHeader({ label, count }: { label: string; count?: number }) {
 	const s = useThemedStyles(makeStyles);
 	return (
 		<View style={s.listSectionHeader}>
@@ -320,6 +320,11 @@ export function ListSectionHeader({ label }: { label: string }) {
 				{label}
 			</Text>
 			<View style={s.listSectionRule} />
+			{count !== undefined ? (
+				<Text maxFontSizeMultiplier={fontScaleCap.chrome} style={s.listSectionCount}>
+					{count}
+				</Text>
+			) : null}
 		</View>
 	);
 }
@@ -727,6 +732,8 @@ const makeStyles = (t: Theme) =>
 		},
 		listSectionLabel: { color: t.textTertiary, fontSize: 12, lineHeight: 16, fontWeight: "500" },
 		listSectionRule: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: t.borderSubtle },
+		// Mono and tabular so a count changing from 9 to 10 does not shift the rule.
+		listSectionCount: { color: t.textFaint, fontSize: 12, fontWeight: "700", fontFamily: t.fontMono },
 		badge: { flexDirection: "row", alignItems: "center", gap: 6 },
 		badgeText: { fontSize: 12, fontWeight: "600" },
 

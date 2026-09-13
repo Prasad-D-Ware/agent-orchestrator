@@ -8,7 +8,9 @@ import { classifyConnectionFailure, describeConnectionFailure } from "../../lib/
 import { haptics } from "../../lib/haptics";
 import { OrchestratorProjectRowView } from "../../lib/orchestrator-project-row";
 import { orchestratorProjectSections, type OrchestratorProjectRow } from "../../lib/orchestratorView";
+import { StaleBanner } from "../../lib/StaleBanner";
 import { useApp } from "../../lib/store";
+import { UnpairedState } from "../../lib/UnpairedState";
 import type { Theme } from "../../lib/theme";
 import { useTheme, useThemedStyles } from "../../lib/ThemeProvider";
 import { useTabScrollToTop } from "../../lib/useTabScrollToTop";
@@ -128,7 +130,7 @@ export default function ProjectsScreen() {
 			<View style={styles.screen}>
 				<View style={{ height: insets.top }} />
 				<ScreenHeader title="Projects" status={connection} />
-				<EmptyState icon="share-2" title="No server" message="Connect to AO in Settings." />
+				<UnpairedState />
 			</View>
 		);
 	}
@@ -149,6 +151,7 @@ export default function ProjectsScreen() {
 					/>
 				}
 			/>
+			<StaleBanner error={!!error} onRetry={onRefresh} />
 
 			{loading && projects.length === 0 ? (
 				<View style={styles.center}>

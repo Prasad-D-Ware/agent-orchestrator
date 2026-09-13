@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { STALE_AFTER_MS, screenStateFor, showsList, showsStaleBanner } from "./screenState";
+import {
+	STALE_AFTER_MS,
+	screenStateFor,
+	showsList,
+	showsStaleBanner,
+	staleAgeLabel,
+} from "./screenState";
 
 const input = (over: Partial<Parameters<typeof screenStateFor>[0]> = {}) => ({
 	configured: true,
@@ -64,6 +70,27 @@ describe("screenStateFor", () => {
 
 	it("treats a never-fetched screen with rows as current", () => {
 		expect(screenStateFor(input({ staleForMs: null }))).toEqual({ kind: "ready" });
+	});
+});
+
+describe("staleAgeLabel", () => {
+	// A banner that says the data is stale and "0m ago" in the same breath reads
+	// as a bug, so the sub-minute case gets words rather than a number.
+	it("says moments rather than zero below a minute", () => {
+		expect(staleAgeLabel(0)).toBe("moments ago");
+		expect(staleAgeLabel(59_000)).toBe("moments ago");
+	});
+
+	it("uses the same m/h/d vocabulary as the row timestamps", () => {
+		expect(staleAgeLabel(60_000)).toBe("1m ago");
+		expect(staleAgeLabel(45 * 60_000)).toBe("45m ago");
+		expect(staleAgeLabel(60 * 60_000)).toBe("1h ago");
+		expect(staleAgeLabel(23 * 60 * 60_000)).toBe("23h ago");
+		expect(staleAgeLabel(24 * 60 * 60_000)).toBe("1d ago");
+	});
+
+	it("never reports a negative age when the device clock moves backwards", () => {
+		expect(staleAgeLabel(-5_000)).toBe("moments ago");
 	});
 });
 
