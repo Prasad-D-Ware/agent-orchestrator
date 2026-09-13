@@ -82,6 +82,14 @@ type AppState = {
 	error: string | null;
 	// HTTP status behind `error`, or null when the server was never reached.
 	errorStatus: number | null;
+	/**
+	 * When the last successful poll landed, in epoch milliseconds. 0 if none has.
+	 *
+	 * Deliberately a getter rather than a value: a timestamp that changed on every
+	 * successful tick would re-render every consumer of this store once per poll.
+	 * Read it through useStaleness, which owns the clock.
+	 */
+	getLastSyncAt: () => number;
 	// actions
 	reloadConfig: () => Promise<void>;
 	refresh: () => Promise<void>;
@@ -151,6 +159,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	// Whether the most recent poll reached the daemon. Distinct from openRef,
 	// which latches on first connect and never clears.
 	const lastTickOkRef = useRef(false);
+	// When the last successful poll landed, for the stale-data banner. 0 means
+	// "never synced".
+	//
+	// A ref rather than state, and read through a stable getter below, because a
+	// fresh timestamp in the context value on every successful tick would
+	// re-render every consumer of this store once per poll — which is precisely
+	// what "re-render the board on a change, not on the poll tick" removed. Only
+	// the banner subscribes to the passage of time; the board does not.
+	const lastSyncAtRef = useRef(0);
 	// Whether the last failure had no HTTP status — nothing answered at all,
 	// which is what leaving a network looks like.
 	const lastFailUnreachableRef = useRef(false);
@@ -311,6 +328,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			setErrorStatus(null);
 			setConnection("open");
 			lastTickOkRef.current = true;
+			lastSyncAtRef.current = Date.now();
 			if (!openRef.current) {
 				openRef.current = true;
 				const trigger = everConnectedRef.current ? "reconnect" : "launch";
@@ -517,6 +535,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
 	// Memoized so the provider doesn't hand every useApp() consumer a brand-new
 	// object (causing re-renders) on each render. Re-renders now track real state changes.
+	// Stable for the life of the provider, which is what lets it sit in the memo's
+	// dependency list below without ever busting it.
+	const getLastSyncAt = useCallback(() => lastSyncAtRef.current, []);
+
 	const value = useMemo<AppState>(
 		() => ({
 			config,
@@ -534,6 +556,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			loading,
 			error,
 			errorStatus,
+			getLastSyncAt,
 			reloadConfig,
 			refresh,
 			setActiveProject,
@@ -560,6 +583,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			loading,
 			error,
 			errorStatus,
+			getLastSyncAt,
 			reloadConfig,
 			refresh,
 			setActiveProject,
