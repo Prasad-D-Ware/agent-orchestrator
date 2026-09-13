@@ -5,23 +5,22 @@ import * as DocumentPicker from "expo-document-picker";
 import { File } from "expo-file-system";
 import { useEffect, useMemo, useState } from "react";
 import {
+	Animated,
 	InteractionManager,
-	Keyboard,
 	Platform,
 	Pressable,
 	ScrollView,
 	StyleSheet,
 	Text,
-	useWindowDimensions,
 	View,
 } from "react-native";
+import { useKeyboardAnimation } from "react-native-keyboard-controller";
 import { agentErrorCopy } from "../lib/agentError";
 import { defaultAgent, rankAgents } from "../lib/agentPicker";
 import { ApiError, getAgentModels, getAgents, getProject, getSettings, type AgentCatalog, type AgentModelCatalog, type ProjectDetail, type SessionMode } from "../lib/api";
 import { classifyConnectionFailure, describeConnectionFailure } from "../lib/connectionError";
 import { chatErrorCopy, isChatPreflightError } from "../lib/chatError";
 import { haptics } from "../lib/haptics";
-import { keyboardOverlap } from "../lib/worker-dock-layout";
 import { modelOverride, resolveSpawnAgent, resolveSpawnModel, spawnModelSourceChanged } from "../lib/spawnModel";
 import { appendSpawnAttachments, type SpawnAttachment } from "../lib/spawn-attachments";
 import { SpawnComposerControls } from "../lib/spawn-composer-controls";
@@ -35,7 +34,6 @@ export default function SpawnModal() {
 	const t = useTheme();
 	const styles = useThemedStyles(makeStyles);
 	const router = useRouter();
-	const { height: windowHeight } = useWindowDimensions();
 	const { projectId: routeProjectId } = useLocalSearchParams<{ projectId?: string }>();
 	const { projects, activeProjectId, config, spawn } = useApp();
 
@@ -56,37 +54,21 @@ export default function SpawnModal() {
 	const [modelError, setModelError] = useState<string>();
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	const [keyboardHeight, setKeyboardHeight] = useState(0);
 
 	const [catalog, setCatalog] = useState<AgentCatalog | null>(null);
 	const [catalogError, setCatalogError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [offerTUI, setOfferTUI] = useState(false);
 
-	useEffect(() => {
-		if (Platform.OS === "ios") {
-			const updateFromFrame = (event: Parameters<typeof Keyboard.scheduleLayoutAnimation>[0]) => {
-				setKeyboardHeight(
-					keyboardOverlap(windowHeight, event.endCoordinates.screenY, event.endCoordinates.height),
-				);
-			};
-			const willChange = Keyboard.addListener("keyboardWillChangeFrame", (event) => {
-				Keyboard.scheduleLayoutAnimation(event);
-				updateFromFrame(event);
-			});
-			const didChange = Keyboard.addListener("keyboardDidChangeFrame", updateFromFrame);
-			const didHide = Keyboard.addListener("keyboardDidHide", () => setKeyboardHeight(0));
-			return () => {
-				willChange.remove();
-				didChange.remove();
-				didHide.remove();
-			};
-		}
-
-		// The native Android form sheet already resizes for the IME. Adding the
-		// keyboard height a second time pushed the selector rail below the sheet.
-		return undefined;
-	}, [windowHeight]);
+	// Tracks the IME frame by frame rather than in the two steps the platform
+	// listeners reported. `height` is already the *visible* keyboard height and is
+	// 0 once dismissed, which is exactly what keyboardOverlap used to derive from
+	// the frame's screenY — so the helper is redundant here now.
+	//
+	// Only the iOS sheet consumes it: the native Android form sheet resizes itself
+	// for the IME, and adding the height a second time pushed the selector rail
+	// below the sheet.
+	const { height: keyboardHeight } = useKeyboardAnimation();
 
 	// Seed from the active project, or the only project. Mirrors the store's
 	// `targetProject()`; kept here because the screen needs it as UI state to
@@ -356,7 +338,9 @@ export default function SpawnModal() {
 		);
 	}
 
-	return <View style={[styles.screen, { paddingBottom: keyboardHeight }]}>{content}</View>;
+	// Animated.View rather than View: the height above is a driven Animated value,
+	// and a plain View would silently ignore it.
+	return <Animated.View style={[styles.screen, { paddingBottom: keyboardHeight }]}>{content}</Animated.View>;
 }
 
 // Human copy for a failed spawn, matching every other screen. This one used to
