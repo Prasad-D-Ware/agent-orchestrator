@@ -2,6 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { useHeaderHeight } from "expo-router/build/react-navigation/elements";
 import { useNavigation, useRouter } from "expo-router";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useKeyboardState } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
 	ActivityIndicator,
@@ -9,7 +10,6 @@ import {
 	InteractionManager,
 	Keyboard,
 	KeyboardAvoidingView,
-	LayoutAnimation,
 	Platform,
 	Pressable,
 	StyleSheet,
@@ -94,8 +94,13 @@ export function ChatSessionScreen({ session }: { session: MobileChatSession }) {
 	const filePathsRequest = useRef<Promise<{ paths: string[]; truncated: boolean }> | null>(null);
 	const [openingShell, setOpeningShell] = useState(false);
 	const [resuming, setResuming] = useState(false);
-	const [keyboardHeight, setKeyboardHeight] = useState(0);
-	const [keyboardVisible, setKeyboardVisible] = useState(false);
+	// Listens on keyboardWillShow / keyboardDidHide on both platforms. The effect
+	// this replaces took its event names from screenKeyboardAvoidance, which gave
+	// Android keyboardDidShow — fired only after the IME had finished animating,
+	// which is why the composer needed a hand-rolled LayoutAnimation to cover the
+	// gap it left. Reporting early removes the gap rather than animating over it.
+	const keyboardHeight = useKeyboardState((state) => state.height);
+	const keyboardVisible = useKeyboardState((state) => state.isVisible);
 	const turnOptionsRequestedFor = useRef<string | undefined>(undefined);
 	const terminated = "projectName" in session ? Boolean(session.isTerminal) : Boolean(session.isTerminated);
 	const interfaceTransitionActive = mobileInterfaceTransitionIsActive(interfaceSwitch.transition);
@@ -127,29 +132,6 @@ export function ChatSessionScreen({ session }: { session: MobileChatSession }) {
 				item.status === "pending",
 		),
 	);
-
-	useEffect(() => {
-		const platform = Platform.OS === "ios" ? "ios" : "android";
-		const avoidance = screenKeyboardAvoidance(platform, 0, insets.bottom);
-		const animate = (duration?: number) => LayoutAnimation.configureNext({
-			duration: duration || 250,
-			update: { type: LayoutAnimation.Types.keyboard },
-		});
-		const show = Keyboard.addListener(avoidance.showEvent, (event) => {
-			if (Platform.OS === "android") animate(event.duration);
-			setKeyboardVisible(true);
-			setKeyboardHeight(event.endCoordinates.height);
-		});
-		const hide = Keyboard.addListener(avoidance.hideEvent, (event) => {
-			if (Platform.OS === "android") animate(event?.duration);
-			setKeyboardVisible(false);
-			setKeyboardHeight(0);
-		});
-		return () => {
-			show.remove();
-			hide.remove();
-		};
-	}, [insets.bottom]);
 
 	useEffect(() => {
 		if (!conversation.snapshot || turnOptionsRequestedFor.current === session.id) return;
