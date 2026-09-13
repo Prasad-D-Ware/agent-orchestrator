@@ -47,7 +47,7 @@ export function OrchestratorProjectRowView({
 			{!running ? (
 				<View style={styles.headlineRow}>
 					<Text style={styles.headline} numberOfLines={1}>
-						{row.headline}
+						{row.detail}
 					</Text>
 				</View>
 			) : null}
