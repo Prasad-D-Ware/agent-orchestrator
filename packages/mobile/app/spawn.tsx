@@ -5,7 +5,6 @@ import * as DocumentPicker from "expo-document-picker";
 import { File } from "expo-file-system";
 import { useEffect, useMemo, useState } from "react";
 import {
-	Animated,
 	InteractionManager,
 	Platform,
 	Pressable,
@@ -14,7 +13,7 @@ import {
 	Text,
 	View,
 } from "react-native";
-import { useKeyboardAnimation } from "react-native-keyboard-controller";
+import { useKeyboardState } from "react-native-keyboard-controller";
 import { agentErrorCopy } from "../lib/agentError";
 import { defaultAgent, rankAgents } from "../lib/agentPicker";
 import { ApiError, getAgentModels, getAgents, getProject, getSettings, type AgentCatalog, type AgentModelCatalog, type ProjectDetail, type SessionMode } from "../lib/api";
@@ -60,15 +59,20 @@ export default function SpawnModal() {
 	const [loading, setLoading] = useState(true);
 	const [offerTUI, setOfferTUI] = useState(false);
 
-	// Tracks the IME frame by frame rather than in the two steps the platform
-	// listeners reported. `height` is already the *visible* keyboard height and is
-	// 0 once dismissed, so the overlap this screen used to compute from the
-	// event's screenY is no longer something anyone has to derive.
+	// Deliberately useKeyboardState, not useKeyboardAnimation.
+	//
+	// useKeyboardAnimation().height is built as `Animated.multiply(height, -1)` —
+	// it is negative on purpose, so `transform: [{ translateY: height }]` lifts a
+	// view. Feeding that to `paddingBottom` applies no padding at all, which let
+	// the keyboard cover the project/model selectors and the Spawn button.
+	//
+	// This screen pads rather than translates, so it wants the plain positive
+	// height — the same value the Workers board and the chat screen use.
 	//
 	// Only the iOS sheet consumes it: the native Android form sheet resizes itself
 	// for the IME, and adding the height a second time pushed the selector rail
 	// below the sheet.
-	const { height: keyboardHeight } = useKeyboardAnimation();
+	const keyboardHeight = useKeyboardState((state) => state.height);
 
 	// Seed from the active project, or the only project. Mirrors the store's
 	// `targetProject()`; kept here because the screen needs it as UI state to
@@ -338,9 +342,7 @@ export default function SpawnModal() {
 		);
 	}
 
-	// Animated.View rather than View: the height above is a driven Animated value,
-	// and a plain View would silently ignore it.
-	return <Animated.View style={[styles.screen, { paddingBottom: keyboardHeight }]}>{content}</Animated.View>;
+	return <View style={[styles.screen, { paddingBottom: keyboardHeight }]}>{content}</View>;
 }
 
 // Human copy for a failed spawn, matching every other screen. This one used to

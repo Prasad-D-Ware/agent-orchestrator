@@ -68,7 +68,10 @@ export function useOptionalSidebarNavigation() {
 
 export function SidebarNavigationShell({ children }: { children: ReactNode }) {
 	const styles = useThemedStyles(makeStyles);
-	const { sessions, projects } = useApp();
+	const { sessions, projects, connection } = useApp();
+	// See the iOS shell: cached sessions outlive a failed poll by design, so the
+	// drawer has to admit when what it is showing is no longer live.
+	const sessionsStale = connection !== "open";
 	const router = useRouter();
 	const pathname = usePathname();
 	const insets = useSafeAreaInsets();
@@ -239,11 +242,14 @@ export function SidebarNavigationShell({ children }: { children: ReactNode }) {
 				</View>
 			</View>
 
-			<Text style={styles.sectionLabel}>{RECENT_WORKERS_LABEL.toUpperCase()}</Text>
+			<Text style={styles.sectionLabel}>
+				{RECENT_WORKERS_LABEL.toUpperCase()}
+				{sessionsStale ? <Text style={styles.sectionLabelStale}>{"  ·  DISCONNECTED"}</Text> : null}
+			</Text>
 			<FlatList
 				data={liveSessions}
 				keyExtractor={(session) => `${session.projectId}:${session.id}`}
-				style={styles.sessionList}
+				style={[styles.sessionList, sessionsStale && styles.sessionListStale]}
 			contentContainerStyle={[
 				liveSessions.length === 0 ? styles.emptySessionList : styles.sessionListContent,
 				{ paddingBottom: insets.bottom + 76 },
@@ -401,7 +407,9 @@ const makeStyles = (t: Theme) => StyleSheet.create({
 		fontWeight: "700",
 		letterSpacing: 0.7,
 	},
+	sectionLabelStale: { color: t.amber },
 	sessionList: { flex: 1 },
+	sessionListStale: { opacity: 0.55 },
 	sessionListContent: { paddingBottom: 8 },
 	emptySessionList: { flexGrow: 1 },
 	emptySessions: { paddingHorizontal: 12, paddingTop: 8, color: t.textTertiary, fontSize: 14 },
