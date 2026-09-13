@@ -63,8 +63,8 @@ export default function SpawnModal() {
 
 	// Tracks the IME frame by frame rather than in the two steps the platform
 	// listeners reported. `height` is already the *visible* keyboard height and is
-	// 0 once dismissed, which is exactly what keyboardOverlap used to derive from
-	// the frame's screenY — so the helper is redundant here now.
+	// 0 once dismissed, so the overlap this screen used to compute from the
+	// event's screenY is no longer something anyone has to derive.
 	//
 	// Only the iOS sheet consumes it: the native Android form sheet resizes itself
 	// for the IME, and adding the height a second time pushed the selector rail
