@@ -70,6 +70,10 @@ export default function PRsScreen() {
 		return (
 			<View style={styles.screen}>
 				<View style={{ height: insets.top }} />
+				{/* Workers and Projects both keep their header in the unpaired state; this
+				    screen dropped it, so the tab lost its title and connection lamp exactly
+				    when a user most needs to know what they are looking at. */}
+				<ScreenHeader title="Pull Requests" status={connection} />
 				<EmptyState icon="git-pull-request" title="No server" message="Connect to AO in Settings." />
 			</View>
 		);
