@@ -1,17 +1,21 @@
-import { Button, Column, Host, Row, Spacer, Text } from "@expo/ui";
+import { Button, Column, Host, Icon, RNHostView, Row, Spacer, Text } from "@expo/ui";
+import { rotationEffect } from "@expo/ui/swift-ui/modifiers";
 import { usePathname, useRouter } from "expo-router";
 import {
 	createContext,
 	useCallback,
 	useContext,
+	useEffect,
 	useMemo,
 	useRef,
 	useState,
 	type ReactNode,
 } from "react";
 import {
+	AccessibilityInfo,
 	Animated,
 	FlatList,
+	Image,
 	PanResponder,
 	Pressable,
 	StyleSheet,
@@ -20,6 +24,7 @@ import {
 	View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import MASCOT from "../assets/mascot.png";
 import { AgentLogo } from "./AgentLogo";
 import type { DashboardSession } from "./api";
 import { haptics } from "./haptics";
@@ -29,8 +34,10 @@ import { sidebarDestinationHitModifiers } from "./sidebar-destination-hit-modifi
 import {
 	activeSidebarDestination,
 	RECENT_WORKERS_LABEL,
+	selectedPrimarySidebarDestination,
 	sidebarDestinations,
 	sidebarSessions,
+	type PrimarySidebarDestinationId,
 	type SidebarDestination,
 	type SidebarDestinationId,
 } from "./sidebar-navigation";
@@ -59,6 +66,10 @@ export function useSidebarNavigation() {
 	return context;
 }
 
+export function useOptionalSidebarNavigation() {
+	return useContext(SidebarNavigationContext);
+}
+
 export function SidebarNavigationShell({ children }: { children: ReactNode }) {
 	const t = useTheme();
 	const styles = useThemedStyles(makeStyles);
@@ -69,16 +80,37 @@ export function SidebarNavigationShell({ children }: { children: ReactNode }) {
 	const insets = useSafeAreaInsets();
 	const { width } = useWindowDimensions();
 	const [open, setOpen] = useState(false);
+	const [reduceMotion, setReduceMotion] = useState(false);
 	const [scrollRequest, setScrollRequest] = useState<ScrollRequest | null>(null);
 	const progress = useRef(new Animated.Value(0)).current;
 	const gestureStartedOpen = useRef(false);
 	const activeDestination = activeSidebarDestination(pathname);
-	const drawerWidth = Math.min(width * 0.82, 360);
+	const lastPrimaryDestination = useRef<PrimarySidebarDestinationId>("agents");
+	const selectedPrimaryDestination = selectedPrimarySidebarDestination(
+		pathname,
+		lastPrimaryDestination.current,
+	);
+	lastPrimaryDestination.current = selectedPrimaryDestination;
+	const drawerWidth = Math.min(width * 0.76, 320);
 	const liveSessions = useMemo(() => sidebarSessions(sessions), [sessions]);
 	const projectNames = useMemo(
 		() => new Map(projects.map((project) => [project.id, project.name])),
 		[projects],
 	);
+
+	useEffect(() => {
+		let mounted = true;
+		void AccessibilityInfo.isReduceMotionEnabled()
+			.then((enabled) => {
+				if (mounted) setReduceMotion(enabled);
+			})
+			.catch(() => {});
+		const subscription = AccessibilityInfo.addEventListener("reduceMotionChanged", setReduceMotion);
+		return () => {
+			mounted = false;
+			subscription.remove();
+		};
+	}, []);
 
 	const animateSidebar = useCallback((nextOpen: boolean) => {
 		setOpen(nextOpen);
@@ -170,13 +202,25 @@ export function SidebarNavigationShell({ children }: { children: ReactNode }) {
 			{ scale: progress.interpolate({ inputRange: [0, 1], outputRange: [1, 0.97] }) },
 		],
 	};
+	const sidebarContentTransform = {
+		opacity: reduceMotion
+			? 1
+			: progress.interpolate({ inputRange: [0, 1], outputRange: [0.86, 1] }),
+		transform: reduceMotion
+			? []
+			: [
+				{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) },
+				{ scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] }) },
+			],
+	};
 
 	return (
 		<SidebarNavigationContext.Provider value={context}>
 			<View style={styles.shell} {...panResponder.panHandlers}>
-				<View
+				<Animated.View
 					style={[
 						styles.sidebar,
+						sidebarContentTransform,
 						{
 							width: drawerWidth,
 							paddingTop: insets.top + 10,
@@ -187,24 +231,24 @@ export function SidebarNavigationShell({ children }: { children: ReactNode }) {
 					importantForAccessibility={open ? "yes" : "no-hide-descendants"}
 				>
 					<View style={styles.sidebarTop}>
-						<Host style={{ width: drawerWidth - 32, height: 294 }} colorScheme={scheme} seedColor={t.blue}>
+						<Host style={{ width: drawerWidth - 32, height: 232 }} colorScheme={scheme} seedColor={t.blue}>
 							<Column
 								alignment="start"
 								spacing={0}
-								style={{ width: drawerWidth - 32, height: 294 }}
+								style={{ width: drawerWidth - 32, height: 232 }}
 							>
-								<Text
-									textStyle={{ color: t.textPrimary, fontSize: 32, fontWeight: "800", letterSpacing: -0.8 }}
-								>
-									AO
-								</Text>
-								<Spacer size={26} />
+								<RNHostView matchContents>
+									<View style={styles.brandMascotSlot}>
+										<Image source={MASCOT} resizeMode="contain" style={styles.brandMascot} accessibilityLabel="AO mascot" />
+									</View>
+								</RNHostView>
+								<Spacer size={14} />
 								<Column spacing={7} style={{ width: drawerWidth - 32 }}>
 									{sidebarDestinations.slice(0, -1).map((destination) => (
 										<DestinationRow
 											key={destination.id}
 											destination={destination}
-											active={destination.id === activeDestination}
+											active={destination.id === selectedPrimaryDestination}
 											onPress={() => selectDestination(destination)}
 											drawerWidth={drawerWidth}
 										/>
@@ -219,7 +263,10 @@ export function SidebarNavigationShell({ children }: { children: ReactNode }) {
 						data={liveSessions}
 						keyExtractor={(session) => `${session.projectId}:${session.id}`}
 						style={styles.sessionList}
-						contentContainerStyle={liveSessions.length === 0 ? styles.emptySessionList : styles.sessionListContent}
+						contentContainerStyle={[
+							liveSessions.length === 0 ? styles.emptySessionList : styles.sessionListContent,
+							{ paddingBottom: insets.bottom + 76 },
+						]}
 						showsVerticalScrollIndicator={false}
 						renderItem={({ item }) => (
 							<SessionRow
@@ -231,25 +278,27 @@ export function SidebarNavigationShell({ children }: { children: ReactNode }) {
 						ListEmptyComponent={<RNText style={styles.emptySessions}>No active sessions</RNText>}
 					/>
 
-					<View style={styles.sidebarActions}>
+					<View pointerEvents="box-none" style={[styles.sidebarActions, { bottom: insets.bottom + 10 }]}>
 						<SidebarSettingsButton
 							active={activeDestination === "settings"}
 							onPress={openSettings}
 						/>
 						<SidebarSpawnButton onPress={spawnWorker} />
 					</View>
-				</View>
+				</Animated.View>
 
-				<Animated.View style={[styles.content, contentTransform, open && styles.contentOpen]}>
-					{children}
-					{open ? (
-						<Pressable
-							accessibilityRole="button"
-							accessibilityLabel="Close navigation"
-							onPress={closeSidebar}
-							style={styles.dismissLayer}
-						/>
-					) : null}
+				<Animated.View style={[styles.contentFrame, contentTransform]}>
+					<View style={[styles.contentSurface, open && styles.contentSurfaceOpen]}>
+						{children}
+						{open ? (
+							<Pressable
+								accessibilityRole="button"
+								accessibilityLabel="Close navigation"
+								onPress={closeSidebar}
+								style={styles.dismissLayer}
+							/>
+						) : null}
+					</View>
 				</Animated.View>
 			</View>
 		</SidebarNavigationContext.Provider>
@@ -288,7 +337,11 @@ function SessionRow({
 					</RNText>
 				</View>
 			</View>
-			{session.isPinned ? <RNText style={styles.pin}>★</RNText> : null}
+			{session.isPinned ? (
+				<Host matchContents>
+					<Icon name="pin.fill" size={13} color={t.textTertiary} modifiers={[rotationEffect(28)]} />
+				</Host>
+			) : null}
 		</Pressable>
 	);
 }
@@ -344,9 +397,11 @@ const makeStyles = (t: Theme) =>
 			bottom: 0,
 			paddingHorizontal: 16,
 		},
-		sidebarTop: { height: 294 },
+		sidebarTop: { height: 232 },
+		brandMascotSlot: { width: 72, height: 48, paddingLeft: 14 },
+		brandMascot: { width: 58, height: 48 },
 		sectionLabel: {
-			marginTop: 14,
+			marginTop: 8,
 			marginBottom: 8,
 			paddingHorizontal: 12,
 			color: t.textTertiary,
@@ -373,23 +428,22 @@ const makeStyles = (t: Theme) =>
 		sessionMetaRow: { marginTop: 4, flexDirection: "row", alignItems: "center", gap: 6 },
 		statusDot: { width: 6, height: 6, borderRadius: 3 },
 		sessionMeta: { flex: 1, color: t.textTertiary, fontSize: 12 },
-		pin: { color: t.textTertiary, fontSize: 12 },
 		sidebarActions: {
-			height: 58,
+			position: "absolute",
+			left: 28,
+			right: 28,
+			height: 48,
 			flexDirection: "row",
 			alignItems: "center",
 			justifyContent: "space-between",
-			paddingHorizontal: 12,
 		},
-		content: { flex: 1, backgroundColor: t.bgBase },
-		contentOpen: {
+		contentFrame: { flex: 1 },
+		contentSurface: { flex: 1, backgroundColor: t.bgBase },
+		contentSurfaceOpen: {
 			borderRadius: 28,
 			overflow: "hidden",
-			shadowColor: "#000",
-			shadowOpacity: 0.3,
-			shadowRadius: 24,
-			shadowOffset: { width: -4, height: 0 },
-			elevation: 16,
+			borderWidth: StyleSheet.hairlineWidth,
+			borderColor: t.borderDefault,
 		},
 		dismissLayer: {
 			position: "absolute",

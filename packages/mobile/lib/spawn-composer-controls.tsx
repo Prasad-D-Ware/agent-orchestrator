@@ -46,14 +46,14 @@ export function SpawnComposerControls({
 				</Host>
 			</View>
 			<Host style={styles.spawnHost} colorScheme={scheme} seedColor={t.blue}>
-				<Button label={busy ? "Spawning…" : "Spawn"} variant="filled" onPress={onSpawn} disabled={disabled} style={styles.spawnButton} />
+				<Button label={busy ? "Starting..." : "Start Task"} variant="filled" onPress={onSpawn} disabled={disabled} style={styles.spawnButton} />
 			</Host>
 		</View>
 	);
 }
 
 const styles = StyleSheet.create({
-	stack: { gap: 10 },
+	stack: { gap: 2 },
 	projectHost: { width: 180, height: 36 },
 	rail: { minHeight: 52, flexDirection: "row", alignItems: "center", gap: 6 },
 	iconHost: { width: 44, height: 44 },

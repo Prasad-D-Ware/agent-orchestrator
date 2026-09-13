@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import MASCOT from "../assets/mascot.png";
 import { relativeTime } from "./notificationView";
 import type { ProjectSummary } from "./projects-view";
 import type { Theme } from "./theme";
@@ -16,7 +17,7 @@ export function ProjectSummaryCard({ summary, onPress }: { summary: ProjectSumma
 		<>
 			<View style={styles.header}>
 				<View style={styles.folder}>
-					<Feather name="folder" size={18} color={t.blue} />
+					<Image source={MASCOT} resizeMode="contain" style={styles.orchestratorMark} accessibilityLabel="AO orchestrator" />
 				</View>
 				<View style={styles.identity}>
 					<Text style={styles.title} numberOfLines={1}>{summary.project.name}</Text>
@@ -64,6 +65,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
 	cardPressed: cardShellPressed(t),
 	header: { flexDirection: "row", alignItems: "center", gap: 10 },
 	folder: { width: 34, height: 34, borderRadius: 10, backgroundColor: t.tintBlue, alignItems: "center", justifyContent: "center" },
+	orchestratorMark: { width: 23, height: 22 },
 	identity: { flex: 1, minWidth: 0 },
 	title: { color: t.textPrimary, fontSize: 17, fontWeight: "700" },
 	kind: { color: t.textTertiary, fontSize: 11, marginTop: 2, textTransform: "capitalize" },

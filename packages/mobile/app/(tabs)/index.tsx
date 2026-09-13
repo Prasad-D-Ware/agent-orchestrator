@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Keyboard, LayoutAnimation, Platform, Pressable, RefreshControl, SectionList, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Alert, Keyboard, LayoutAnimation, Platform, Pressable, RefreshControl, SectionList, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { DashboardSession } from "../../lib/api";
 import { classifyConnectionFailure, describeConnectionFailure } from "../../lib/connectionError";
@@ -13,9 +13,9 @@ import type { Theme } from "../../lib/theme";
 import { statusVisual } from "../../lib/theme";
 import { useTheme, useThemedStyles } from "../../lib/ThemeProvider";
 import { useTabScrollToTop } from "../../lib/useTabScrollToTop";
-import { Button, EmptyState, HeaderIconButton, ScreenHeader } from "../../lib/ui";
+import { Button, EmptyState, HeaderIconButton, ListSectionHeader, ScreenHeader } from "../../lib/ui";
 import { WorkerDock } from "../../lib/worker-dock";
-import { keyboardOverlap, workerDockKeyboardLayout } from "../../lib/worker-dock-layout";
+import { keyboardOverlap, workerDockKeyboardLayout, workerListBottomInset } from "../../lib/worker-dock-layout";
 import { WorkerControlsSheet } from "../../lib/worker-controls-sheet";
 import {
 	ALL_WORKER_PROJECTS,
@@ -32,6 +32,7 @@ import { filterWorkerSessions } from "../../lib/worker-search";
 // permanent footer above the tab bar.
 type ListSection =
 	| BoardSection
+	| { zone: "pinned"; label: string; color: string; data: DashboardSession[] }
 	| { zone: "archive"; label: string; color: string; data: DashboardSession[] }
 	| { zone: "search"; label: string; color: string; data: DashboardSession[] };
 
@@ -41,7 +42,7 @@ export default function FleetScreen() {
 	const router = useRouter();
 	const insets = useSafeAreaInsets();
 	const { height: windowHeight } = useWindowDimensions();
-	const { configured, loading, error, errorStatus, connection, config, refresh, sessions, projects, notificationsUnread, activeEndpoints } =
+	const { configured, loading, error, errorStatus, connection, config, refresh, sessions, projects, notificationsUnread, activeEndpoints, kill, renameWorker, setWorkerPinned } =
 		useApp();
 	const [refreshing, setRefreshing] = useState(false);
 	const [query, setQuery] = useState("");
@@ -49,6 +50,10 @@ export default function FleetScreen() {
 	const [controlsOpen, setControlsOpen] = useState(false);
 	const [workerProjectId, setWorkerProjectId] = useState(ALL_WORKER_PROJECTS);
 	const [keyboardHeight, setKeyboardHeight] = useState(0);
+	const [keyboardVisible, setKeyboardVisible] = useState(false);
+	const [renamingWorkerId, setRenamingWorkerId] = useState<string>();
+	const [activeSwipeId, setActiveSwipeId] = useState<string>();
+	const activeSwipeRef = useRef<{ id: string; close(): void } | undefined>(undefined);
 	// Collapsed by default, like desktop's archive strip: it is history, and on a
 	// long-running project it is most of the sessions.
 	const [archiveOpen, setArchiveOpen] = useState(false);
@@ -73,7 +78,7 @@ export default function FleetScreen() {
 			),
 		[projectSessions, query, projectNames, t],
 	);
-	const { sections, archived } = useMemo(() => groupSessions(t, projectSessions), [t, projectSessions]);
+	const { pinned, sections, archived } = useMemo(() => groupSessions(t, projectSessions), [t, projectSessions]);
 	const filteredGroups = useMemo(() => groupSessions(t, filteredSessions), [t, filteredSessions]);
 	const searchOpen = workerSearchPresentation(searchRequested, query) === "expanded";
 	const selectedProjectLabel = workerProjectLabel(projects, workerProjectId);
@@ -91,15 +96,19 @@ export default function FleetScreen() {
 	// strip costs nothing to scroll past.
 	const listSections = useMemo<ListSection[]>(() => {
 		if (query.trim()) {
-			const data = [...filteredGroups.sections.flatMap((section) => section.data), ...filteredGroups.archived];
+			const data = [...filteredGroups.pinned, ...filteredGroups.sections.flatMap((section) => section.data), ...filteredGroups.archived];
 			return data.length === 0 ? [] : [{ zone: "search", label: "Search results", color: t.blue, data }];
 		}
-		if (archived.length === 0) return sections;
-		return [
+		const liveSections: ListSection[] = [
+			...(pinned.length ? [{ zone: "pinned" as const, label: "Pinned", color: t.amber, data: pinned }] : []),
 			...sections,
+		];
+		if (archived.length === 0) return liveSections;
+		return [
+			...liveSections,
 			{ zone: "archive" as const, label: "Archive", color: t.textFaint, data: archiveOpen ? archived : [] },
 		];
-	}, [query, filteredGroups, sections, archived, archiveOpen, t]);
+	}, [query, filteredGroups, pinned, sections, archived, archiveOpen, t]);
 
 	// Turn the poll's raw failure ("401 - missing or invalid connection password")
 	// into the same human copy the pairing screens use, keyed on the cause.
@@ -130,9 +139,49 @@ export default function FleetScreen() {
 		setRefreshing(false);
 	}, [refresh]);
 
+	// Swipeable's Android callbacks arrive after the UI thread has already begun
+	// opening the next rail. Close the previous native row synchronously so two
+	// action rails cannot be visible while React propagates the active id.
+	const openExclusiveSwipe = useCallback((id: string, close: () => void) => {
+		const previous = activeSwipeRef.current;
+		if (previous?.id !== id) previous?.close();
+		activeSwipeRef.current = { id, close };
+		setActiveSwipeId(id);
+	}, []);
+	const closeExclusiveSwipe = useCallback((id: string) => {
+		if (activeSwipeRef.current?.id === id) activeSwipeRef.current = undefined;
+		setActiveSwipeId((activeId) => (activeId === id ? undefined : activeId));
+	}, []);
+
+	const updateWorkerPin = useCallback(async (session: DashboardSession, pinned: boolean) => {
+		try {
+			await setWorkerPinned(session.id, pinned);
+			haptics.success();
+		} catch (cause) {
+			haptics.error();
+			Alert.alert(
+				"Couldn't update pin",
+				cause instanceof Error ? cause.message : "Please try again.",
+			);
+		}
+	}, [setWorkerPinned]);
+
+	const confirmDeleteSession = useCallback((session: DashboardSession) => {
+		haptics.warning();
+		Alert.alert(
+			"Delete session?",
+			`This terminates ${session.displayName?.trim() || "this worker"}. Its conversation and worktree are preserved.`,
+			[
+				{ text: "Cancel", style: "cancel" },
+				{ text: "Delete session", style: "destructive", onPress: () => void kill(session.id).catch(() => {}) },
+			],
+		);
+	}, [kill]);
+
 	useEffect(() => {
 		if (Platform.OS === "ios") {
 			const updateFromFrame = (event: Parameters<typeof Keyboard.scheduleLayoutAnimation>[0]) => {
+				setKeyboardVisible(event.endCoordinates.height > 0 && event.endCoordinates.screenY < windowHeight);
 				setKeyboardHeight(
 					keyboardOverlap(windowHeight, event.endCoordinates.screenY, event.endCoordinates.height),
 				);
@@ -142,7 +191,7 @@ export default function FleetScreen() {
 				updateFromFrame(event);
 			});
 			const didChange = Keyboard.addListener("keyboardDidChangeFrame", updateFromFrame);
-			const didHide = Keyboard.addListener("keyboardDidHide", () => setKeyboardHeight(0));
+			const didHide = Keyboard.addListener("keyboardDidHide", () => { setKeyboardVisible(false); setKeyboardHeight(0); });
 			return () => {
 				willChange.remove();
 				didChange.remove();
@@ -157,10 +206,12 @@ export default function FleetScreen() {
 			});
 		const show = Keyboard.addListener("keyboardDidShow", (event) => {
 			animate(event.duration);
-			setKeyboardHeight(event.endCoordinates.height);
+			setKeyboardVisible(true);
+			setKeyboardHeight(keyboardOverlap(windowHeight, event.endCoordinates.screenY, event.endCoordinates.height));
 		});
 		const hide = Keyboard.addListener("keyboardDidHide", (event) => {
 			animate(event?.duration);
+			setKeyboardVisible(false);
 			setKeyboardHeight(0);
 		});
 		return () => {
@@ -169,7 +220,7 @@ export default function FleetScreen() {
 		};
 	}, [windowHeight]);
 
-	const keyboardLayout = workerDockKeyboardLayout(keyboardHeight, insets.bottom);
+	const keyboardLayout = workerDockKeyboardLayout(keyboardHeight, insets.bottom, keyboardVisible);
 
 	if (!configured) {
 		return (
@@ -217,7 +268,7 @@ export default function FleetScreen() {
 					ref={listRef}
 					sections={listSections}
 					keyExtractor={(item) => `${item.projectId}:${item.id}`}
-					contentContainerStyle={{ paddingBottom: insets.bottom + 92 }}
+					contentContainerStyle={{ paddingBottom: workerListBottomInset(keyboardLayout.dockBottom) }}
 					stickySectionHeadersEnabled={false}
 					keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
 					keyboardShouldPersistTaps="handled"
@@ -226,11 +277,23 @@ export default function FleetScreen() {
 						section.zone === "archive" ? (
 							<ArchiveHeader count={archived.length} open={archiveOpen} onToggle={() => setArchiveOpen((v) => !v)} />
 						) : (
-							<WorkerSectionHeader label={section.label} />
+							<ListSectionHeader label={section.label} />
 						)
 					}
-					renderItem={({ item }) => (
-						<WorkerListRow session={item} projectName={projectNames.get(item.projectId)} />
+						renderItem={({ item }) => (
+							<WorkerListRow
+								session={item}
+								projectName={projectNames.get(item.projectId)}
+								isRenaming={renamingWorkerId === item.id}
+								activeSwipeId={activeSwipeId}
+								onSwipeOpen={openExclusiveSwipe}
+								onSwipeClose={closeExclusiveSwipe}
+								onRenameStart={() => setRenamingWorkerId(item.id)}
+								onRenameCancel={() => setRenamingWorkerId(undefined)}
+								onRename={(title) => renameWorker(item.id, title)}
+								onSetPinned={(pinned) => updateWorkerPin(item, pinned)}
+								onDelete={() => confirmDeleteSession(item)}
+							/>
 					)}
 					ListEmptyComponent={
 						query.trim() ? (
@@ -276,6 +339,7 @@ export default function FleetScreen() {
 					onSearchOpen={() => setSearchRequested(true)}
 					onSearchClose={() => {
 						Keyboard.dismiss();
+						setQuery("");
 						setSearchRequested(false);
 					}}
 					onOpenControls={() => {
@@ -303,16 +367,6 @@ export default function FleetScreen() {
 				selectedProjectId={workerProjectId}
 				onSelectProject={setWorkerProjectId}
 			/>
-		</View>
-	);
-}
-
-function WorkerSectionHeader({ label }: { label: string }) {
-	const styles = useThemedStyles(makeStyles);
-	return (
-		<View style={styles.workerSectionHeader}>
-			<Text style={styles.workerSectionLabel}>{label}</Text>
-			<View style={styles.workerSectionRule} />
 		</View>
 	);
 }
@@ -360,14 +414,4 @@ const makeStyles = (t: Theme) =>
 			height: 52,
 			flexDirection: "row",
 		},
-		workerSectionHeader: {
-			flexDirection: "row",
-			alignItems: "center",
-			gap: 10,
-			paddingHorizontal: 18,
-			paddingTop: 18,
-			paddingBottom: 5,
-		},
-		workerSectionLabel: { color: t.textTertiary, fontSize: 12, lineHeight: 16, fontWeight: "500" },
-		workerSectionRule: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: t.borderSubtle },
 	});

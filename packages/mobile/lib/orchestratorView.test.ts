@@ -106,6 +106,18 @@ describe("orchestratorStatus", () => {
 		expect(orchestratorStatus(darkTheme, link()).label).toBe("Online");
 	});
 
+	it("shows a live orchestrator as Online when only its activity signal is unavailable", () => {
+		const status = orchestratorStatus(darkTheme, link({ status: "no_signal", hasRuntime: true }));
+		expect(status).toMatchObject({ label: "Online", color: darkTheme.green, breathing: false });
+	});
+
+	it("uses the healthy green treatment when a live orchestrator has no status yet", () => {
+		expect(orchestratorStatus(darkTheme, link())).toMatchObject({
+			label: "Online",
+			color: darkTheme.green,
+		});
+	});
+
 	it("takes its colours from the passed theme", () => {
 		const a = orchestratorStatus(lightTheme, link({ status: "working" }));
 		const b = orchestratorStatus(darkTheme, link({ status: "working" }));
@@ -200,7 +212,7 @@ describe("orchestratorProjectSections", () => {
 
 		expect(rowByProject(sections, "many").detail).toBe("2 workers need input · 1 pull request is ready");
 		expect(rowByProject(sections, "single").detail).toBe("1 worker needs input");
-		expect(rowByProject(sections, "healthy").detail).toBe("Coordinating 3 active workers");
+		expect(rowByProject(sections, "healthy").detail).toBe("3 active workers");
 		expect(rowByProject(sections, "missing").detail).toBe("Start one to coordinate work for this project");
 	});
 
@@ -216,7 +228,7 @@ describe("orchestratorProjectSections", () => {
 
 		expect(sections.map((section) => section.title)).toEqual(["Coordinating"]);
 		expect(rowByProject(sections, "proj")).toMatchObject({
-			detail: "Coordinating 1 active worker",
+			detail: "1 active worker",
 			activityAt: "2026-09-04T10:00:00Z",
 		});
 	});
@@ -272,7 +284,7 @@ describe("orchestratorRowAccessibilityLabel", () => {
 });
 
 describe("orchestratorWorkerPreviews", () => {
-	it("shows the three most recently active live workers with only idle or working state", () => {
+	it("shows the three most recently active live workers with their meaningful status", () => {
 		const previews = orchestratorWorkerPreviews([
 			session({ id: "older", displayName: "Older audit", status: "idle", lastActivityAt: "2026-09-04T08:00:00Z" }),
 			session({ id: "newest", displayName: "Fix search", status: "working", lastActivityAt: "2026-09-04T12:00:00Z" }),
@@ -282,18 +294,18 @@ describe("orchestratorWorkerPreviews", () => {
 		]);
 
 		expect(previews).toEqual([
-			{ id: "newest", name: "Fix search", state: "working" },
-			{ id: "second", name: "Polish workers", state: "working" },
-			{ id: "middle", name: "Review PR 4854", state: "idle" },
+			{ id: "newest", name: "Fix search", status: "working" },
+			{ id: "second", name: "Polish workers", status: "spawning" },
+			{ id: "middle", name: "Review PR 4854", status: "needs_input" },
 		]);
 	});
 
 	it("describes a worker preview as a direct navigation action", () => {
-		expect(orchestratorWorkerAccessibilityLabel({ id: "worker-1", name: "Fix search", state: "working" })).toBe(
+		expect(orchestratorWorkerAccessibilityLabel({ id: "worker-1", name: "Fix search", status: "working" }, "Working")).toBe(
 			"Open worker Fix search, Working",
 		);
-		expect(orchestratorWorkerAccessibilityLabel({ id: "worker-2", name: "Review PR", state: "idle" })).toBe(
-			"Open worker Review PR, Idle",
+		expect(orchestratorWorkerAccessibilityLabel({ id: "worker-2", name: "Review PR", status: "needs_input" }, "Needs input")).toBe(
+			"Open worker Review PR, Needs input",
 		);
 	});
 });

@@ -1,7 +1,6 @@
-import { Host, TextInput as NativeTextInput, useNativeState } from "@expo/ui";
-import { textFieldStyle } from "@expo/ui/swift-ui/modifiers";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
+import BottomSheet, { BottomSheetView } from "@expo/ui/community/bottom-sheet";
 import * as DocumentPicker from "expo-document-picker";
 import { File } from "expo-file-system";
 import { useEffect, useMemo, useState } from "react";
@@ -26,14 +25,14 @@ import { keyboardOverlap } from "../lib/worker-dock-layout";
 import { modelOverride, resolveSpawnAgent, resolveSpawnModel, spawnModelSourceChanged } from "../lib/spawnModel";
 import { appendSpawnAttachments, type SpawnAttachment } from "../lib/spawn-attachments";
 import { SpawnComposerControls } from "../lib/spawn-composer-controls";
+import { SpawnPromptInput } from "../lib/spawn-prompt-input";
 import { useApp } from "../lib/store";
 import type { Theme } from "../lib/theme";
-import { useTheme, useThemedStyles, useThemeState } from "../lib/ThemeProvider";
+import { useTheme, useThemedStyles } from "../lib/ThemeProvider";
 import { Button } from "../lib/ui";
 
 export default function SpawnModal() {
 	const t = useTheme();
-	const { scheme } = useThemeState();
 	const styles = useThemedStyles(makeStyles);
 	const router = useRouter();
 	const { height: windowHeight } = useWindowDimensions();
@@ -46,7 +45,6 @@ export default function SpawnModal() {
 	const [mode, setMode] = useState<SessionMode>("chat");
 	const [chatHarnesses, setChatHarnesses] = useState<string[]>([]);
 	const [prompt, setPrompt] = useState("");
-	const promptValue = useNativeState("");
 	const [attachments, setAttachments] = useState<SpawnAttachment[]>([]);
 	const [attachmentError, setAttachmentError] = useState<string>();
 	const [model, setModel] = useState("");
@@ -85,12 +83,9 @@ export default function SpawnModal() {
 			};
 		}
 
-		const show = Keyboard.addListener("keyboardDidShow", (event) => setKeyboardHeight(event.endCoordinates.height));
-		const hide = Keyboard.addListener("keyboardDidHide", () => setKeyboardHeight(0));
-		return () => {
-			show.remove();
-			hide.remove();
-		};
+		// The native Android form sheet already resizes for the IME. Adding the
+		// keyboard height a second time pushed the selector rail below the sheet.
+		return undefined;
 	}, [windowHeight]);
 
 	// Seed from the active project, or the only project. Mirrors the store's
@@ -147,10 +142,6 @@ export default function SpawnModal() {
 		|| error
 		|| offerTUI,
 	);
-
-	useEffect(() => {
-		if (promptValue.value !== prompt) promptValue.value = prompt;
-	}, [prompt, promptValue]);
 
 	useEffect(() => {
 		if (!config || !projectId) { setProjectDetail(undefined); setProjectDetailLoadedFor(null); return; }
@@ -293,24 +284,11 @@ export default function SpawnModal() {
 		}
 	};
 
-	return (
-		<View style={[styles.screen, { paddingBottom: keyboardHeight }]}>
-			<View style={styles.content}>
-				<Host style={styles.promptHost} colorScheme={scheme} seedColor={t.blue}>
-					<NativeTextInput
-						value={promptValue}
-						onChangeText={setPrompt}
-						placeholder="What should this worker do?"
-						multiline
-						numberOfLines={5}
-						maxLength={4096}
-						autoFocus
-						style={{ width: "100%", height: 154, paddingHorizontal: 4, paddingVertical: 2 }}
-						textStyle={{ color: t.textPrimary, fontSize: 18 }}
-						placeholderTextColor={t.textTertiary}
-						modifiers={[textFieldStyle("plain")]}
-					/>
-				</Host>
+	const content = (
+		<View style={[styles.content, Platform.OS === "android" && styles.androidContent]}>
+				<View style={styles.promptHost}>
+					<SpawnPromptInput value={prompt} onChangeText={setPrompt} />
+				</View>
 
 				{attachments.length ? (
 					<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.attachments}>
@@ -330,9 +308,9 @@ export default function SpawnModal() {
 					</ScrollView>
 				) : null}
 
-				<View style={styles.flexSpacer} />
+		{Platform.OS === "ios" ? <View style={styles.flexSpacer} /> : null}
 
-				{hasComposerMessage ? <View style={styles.messages}>
+		{hasComposerMessage ? <View style={styles.messages}>
 					{mode === "chat" && !loading && agents.length === 0 ? <Text style={styles.warn}>No installed agent on this AO host currently supports Chat. Choose Terminal UI or install/authenticate a Chat-capable agent.</Text> : null}
 					{catalogError ? <Text style={styles.warn}>{catalogError}</Text> : null}
 					{modelError ? <Text style={styles.warn}>{modelError}</Text> : null}
@@ -357,9 +335,28 @@ export default function SpawnModal() {
 					busy={busy}
 					disabled={!projectId || !harness || busy || modelLoading || loading}
 				/>
-			</View>
 		</View>
 	);
+
+	if (Platform.OS === "android") {
+		return (
+			<View style={styles.androidModalRoot}>
+				<BottomSheet
+					index={0}
+					enablePanDownToClose
+					enableDynamicSizing
+					backgroundStyle={{ backgroundColor: t.bgBase }}
+					onClose={() => router.back()}
+				>
+					<BottomSheetView style={styles.androidSheet}>
+						{content}
+					</BottomSheetView>
+				</BottomSheet>
+			</View>
+		);
+	}
+
+	return <View style={[styles.screen, { paddingBottom: keyboardHeight }]}>{content}</View>;
 }
 
 // Human copy for a failed spawn, matching every other screen. This one used to
@@ -380,9 +377,16 @@ const makeStyles = (t: Theme) =>
 	StyleSheet.create({
 		screen: { flex: 1, backgroundColor: t.bgBase },
 		content: { flex: 1, paddingHorizontal: 18, paddingTop: 18, paddingBottom: 8, gap: 10 },
+		androidModalRoot: { flex: 1, backgroundColor: "transparent" },
+		androidSheet: {
+			paddingTop: 6,
+			paddingBottom: 12,
+			backgroundColor: t.bgBase,
+		},
+		androidContent: { flex: 0, paddingTop: 12, paddingBottom: 0 },
 		flexSpacer: { flex: 1 },
 		messages: { gap: 6 },
-		promptHost: { width: "100%", height: 154 },
+		promptHost: { width: "100%", height: 112 },
 		attachments: { gap: 8 },
 		attachment: { maxWidth: 190, height: 36, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, borderRadius: 12, borderCurve: "continuous", backgroundColor: t.bgElevated, borderWidth: StyleSheet.hairlineWidth, borderColor: t.borderSubtle },
 		attachmentName: { flexShrink: 1, color: t.textSecondary, fontSize: 12 },

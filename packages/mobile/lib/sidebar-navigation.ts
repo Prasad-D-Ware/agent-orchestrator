@@ -1,6 +1,7 @@
 import type { DashboardSession } from "./api";
 
 export type SidebarDestinationId = "projects" | "agents" | "prs" | "settings";
+export type PrimarySidebarDestinationId = Exclude<SidebarDestinationId, "settings">;
 
 export type SidebarDestination = {
 	id: SidebarDestinationId;
@@ -31,6 +32,23 @@ export function sidebarSessions(sessions: readonly DashboardSession[]): Dashboar
 export function activeSidebarDestination(pathname: string): SidebarDestinationId {
 	const withoutGroup = pathname.replace(/^\/\(tabs\)/, "") || "/";
 	return sidebarDestinations.find(({ href }) => href === withoutGroup)?.id ?? "agents";
+}
+
+export function selectedPrimarySidebarDestination(
+	pathname: string,
+	previous: PrimarySidebarDestinationId,
+): PrimarySidebarDestinationId {
+	const active = activeSidebarDestination(pathname);
+	return active === "settings" ? previous : active;
+}
+
+function normalizedPath(pathname: string): string {
+	const path = pathname.replace(/^\/\(tabs\)/, "") || "/";
+	return path.length > 1 ? path.replace(/\/$/, "") : path;
+}
+
+export function sidebarNavigationSettled(pendingPath: string | null, pathname: string): boolean {
+	return pendingPath !== null && normalizedPath(pendingPath) === normalizedPath(pathname);
 }
 
 type ScrollableSidebarRef = {

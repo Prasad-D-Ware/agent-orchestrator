@@ -1,12 +1,13 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo } from "react";
-import { SectionList, StyleSheet, View } from "react-native";
+import { Platform, SectionList, StyleSheet, View } from "react-native";
 import { collectPRs, comparePRs } from "../../lib/prView";
 import { PRCard } from "../../lib/PRCard";
 import { ProjectSummaryCard } from "../../lib/project-summary-card";
 import { projectSummaries, projectWorkers } from "../../lib/projects-view";
 import { SessionCard } from "../../lib/SessionCard";
 import { useApp } from "../../lib/store";
+import { MINUTE_MS, useNow } from "../../lib/useNow";
 import type { DashboardPR, DashboardSession } from "../../lib/api";
 import type { Theme } from "../../lib/theme";
 import { useTheme, useThemedStyles, useThemeState } from "../../lib/ThemeProvider";
@@ -23,6 +24,7 @@ export default function ProjectOverviewScreen() {
 	const t = useTheme();
 	const styles = useThemedStyles(makeStyles);
 	const { scheme } = useThemeState();
+	const now = useNow(MINUTE_MS);
 	const { projects, sessions } = useApp();
 	const summary = useMemo(
 		() => projectSummaries(projects, sessions).find((candidate) => candidate.project.id === id),
@@ -59,17 +61,21 @@ export default function ProjectOverviewScreen() {
 				stickySectionHeadersEnabled={false}
 				ListHeaderComponent={<ProjectSummaryCard summary={summary} />}
 				renderSectionHeader={({ section }) => <SectionHeader label={section.title} color={section.color} count={section.data.length} />}
-				renderItem={({ item }) => item.kind === "worker" ? <SessionCard session={item.session} /> : <PRCard pr={item.pr} session={item.session} />}
+				renderItem={({ item }) => item.kind === "worker" ? <SessionCard session={item.session} now={now} /> : <PRCard pr={item.pr} session={item.session} />}
 				ListEmptyComponent={<EmptyState icon="moon" title="No project activity" message="Spawn a worker to start work in this project." />}
 			/>
 			<View style={styles.spawnDock}>
-				<Host style={styles.spawnHost} colorScheme={scheme} seedColor={t.blue}>
-					<NativeButton
-						label="Spawn worker"
-						onPress={() => router.push({ pathname: "/spawn", params: { projectId: summary.project.id } })}
-						style={{ width: "100%", height: 50, borderRadius: 17 }}
-					/>
-				</Host>
+				{Platform.OS === "android" ? (
+					<Button title="Spawn worker" onPress={() => router.push({ pathname: "/spawn", params: { projectId: summary.project.id } })} />
+				) : (
+					<Host style={styles.spawnHost} colorScheme={scheme} seedColor={t.blue}>
+						<NativeButton
+							label="Spawn worker"
+							onPress={() => router.push({ pathname: "/spawn", params: { projectId: summary.project.id } })}
+							style={{ height: 50, borderRadius: 17 }}
+						/>
+					</Host>
+				)}
 			</View>
 		</View>
 	);

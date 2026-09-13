@@ -8,12 +8,13 @@ type SidebarGesture = {
 	startX: number;
 	dx: number;
 	dy: number;
+	edgeWidth?: number;
 };
 
-export function shouldCaptureSidebarGesture({ open, startX, dx, dy }: SidebarGesture): boolean {
+export function shouldCaptureSidebarGesture({ open, startX, dx, dy, edgeWidth = EDGE_ACTIVATION_WIDTH }: SidebarGesture): boolean {
 	if (Math.abs(dx) < DIRECTION_LOCK_DISTANCE || Math.abs(dx) <= Math.abs(dy)) return false;
 	if (open) return dx < 0;
-	return startX <= EDGE_ACTIVATION_WIDTH && dx > 0;
+	return startX <= edgeWidth && dx > 0;
 }
 
 export function sidebarGestureTarget({

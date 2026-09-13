@@ -31,10 +31,14 @@ export function orchestratorStatus(
 	const state = orchestratorState(link);
 	if (state === "missing") return { label: "Not started", color: t.textFaint, breathing: false };
 	if (state === "stopped") return { label: "Stopped", color: t.textTertiary, breathing: false };
+	// `no_signal` describes missing activity telemetry, not a dead runtime. The
+	// project row already knows this orchestrator is live from its runtime facts,
+	// so presenting it as anything other than online is misleading.
+	if (link?.status === "no_signal") return { label: "Online", color: t.green, breathing: false };
 	// Running: defer to the shared status vocabulary so the orchestrator speaks
 	// the same language as a session card.
 	const v = link?.status ? statusVisual(t, link.status) : null;
-	return v ? { label: v.label, color: v.color, breathing: !!v.breathing } : { label: "Online", color: t.blue, breathing: false };
+	return v ? { label: v.label, color: v.color, breathing: !!v.breathing } : { label: "Online", color: t.green, breathing: false };
 }
 
 export type LaunchIntent = { clean: boolean; label: string; confirm: boolean };
@@ -121,7 +125,7 @@ export type OrchestratorProjectSection = {
 export type OrchestratorWorkerPreview = {
 	id: string;
 	name: string;
-	state: "idle" | "working";
+	status: string;
 };
 
 /** The small, recency-first worker snapshot shown below a project orchestrator. */
@@ -140,12 +144,15 @@ export function orchestratorWorkerPreviews(
 		.map(({ worker }) => ({
 			id: worker.id,
 			name: sessionTitle(worker),
-			state: worker.status === "working" || worker.status === "starting" ? "working" : "idle",
+			status: worker.status === "starting" ? "spawning" : worker.status ?? "idle",
 		}));
 }
 
-export function orchestratorWorkerAccessibilityLabel(worker: OrchestratorWorkerPreview): string {
-	return `Open worker ${worker.name}, ${worker.state === "working" ? "Working" : "Idle"}`;
+export function orchestratorWorkerAccessibilityLabel(
+	worker: OrchestratorWorkerPreview,
+	statusLabel: string,
+): string {
+	return `Open worker ${worker.name}, ${statusLabel}`;
 }
 
 export function orchestratorRowAccessibilityLabel(
@@ -193,7 +200,7 @@ function detailFor(state: OrchestratorState, workers: DashboardSession[], zones:
 	if (needsReview) parts.push(countPhrase(needsReview, "worker needs review", "workers need review"));
 	if (ready) parts.push(countPhrase(ready, "pull request is ready", "pull requests are ready"));
 	if (parts.length) return parts.join(" · ");
-	if (workers.length) return `Coordinating ${countPhrase(workers.length, "active worker", "active workers")}`;
+	if (workers.length) return countPhrase(workers.length, "active worker", "active workers");
 	return "Ready for coordinated work";
 }
 

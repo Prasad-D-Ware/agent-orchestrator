@@ -15,7 +15,7 @@ import {
 } from "react-native";
 import { haptics } from "./haptics";
 import { NativeHeaderButton, type NativeHeaderButtonIcon } from "./native-header-button";
-import { useSidebarNavigation } from "./sidebar-navigation-shell";
+import { useOptionalSidebarNavigation } from "./sidebar-navigation-shell";
 import type { ConnStatus } from "./store";
 import { statusVisual, type Theme } from "./theme";
 import { useTheme, useThemedStyles } from "./ThemeProvider";
@@ -241,20 +241,23 @@ function MascotLamp({ status }: { status?: ConnStatus }) {
 export function ScreenHeader({
 	title,
 	subtitle,
+	left,
 	right,
 	status,
 }: {
 	title: string;
 	subtitle?: string;
+	/** Detail routes can supply a back action instead of the sidebar button. */
+	left?: ReactNode;
 	right?: ReactNode;
 	/** Drives the wand-tip lamp. Omit to render the mascot with no lamp. */
 	status?: ConnStatus;
 }) {
 	const s = useThemedStyles(makeStyles);
-	const { openSidebar } = useSidebarNavigation();
+	const sidebar = useOptionalSidebarNavigation();
 	return (
 		<View style={s.screenHeader}>
-			<HeaderIconButton icon="menu" label="Open navigation" onPress={openSidebar} />
+			{left ?? (sidebar ? <HeaderIconButton icon="menu" label="Open navigation" onPress={sidebar.openSidebar} /> : null)}
 			<View style={{ flex: 1 }}>
 				<View style={s.titleRow}>
 					<Text style={s.screenTitle}>{title}</Text>
@@ -267,6 +270,16 @@ export function ScreenHeader({
 				) : null}
 			</View>
 			{right}
+		</View>
+	);
+}
+
+export function ListSectionHeader({ label }: { label: string }) {
+	const s = useThemedStyles(makeStyles);
+	return (
+		<View style={s.listSectionHeader}>
+			<Text style={s.listSectionLabel}>{label}</Text>
+			<View style={s.listSectionRule} />
 		</View>
 	);
 }
@@ -648,6 +661,16 @@ export function EmptyState({
 
 const makeStyles = (t: Theme) =>
 	StyleSheet.create({
+		listSectionHeader: {
+			flexDirection: "row",
+			alignItems: "center",
+			gap: 10,
+			paddingHorizontal: 18,
+			paddingTop: 18,
+			paddingBottom: 5,
+		},
+		listSectionLabel: { color: t.textTertiary, fontSize: 12, lineHeight: 16, fontWeight: "500" },
+		listSectionRule: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: t.borderSubtle },
 		badge: { flexDirection: "row", alignItems: "center", gap: 6 },
 		badgeText: { fontSize: 12, fontWeight: "600" },
 

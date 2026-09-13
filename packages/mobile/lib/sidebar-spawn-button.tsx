@@ -12,7 +12,7 @@ export function SidebarSpawnButton({ onPress }: { onPress: () => void }) {
 				onPress={onPress}
 				testID="sidebar-spawn-worker"
 				variant="outlined"
-				style={{ width: 48, height: 48, borderRadius: 24 }}
+				style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: "transparent" }}
 			/>
 		</Host>
 	);

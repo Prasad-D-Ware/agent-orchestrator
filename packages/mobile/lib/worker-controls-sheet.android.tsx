@@ -35,6 +35,7 @@ export function WorkerControlsSheet({
 			enablePanDownToClose
 			enableDynamicSizing={false}
 			backgroundStyle={{ backgroundColor: t.bgSurface }}
+			handleIndicatorStyle={{ backgroundColor: t.borderStrong }}
 			onClose={onDismiss}
 		>
 			<BottomSheetView style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
@@ -52,12 +53,13 @@ export function WorkerControlsSheet({
 					accessibilityRole="button"
 					accessibilityLabel="Search workers"
 					testID="worker-controls-search"
+					android_ripple={{ color: t.tintBlue }}
 					onPress={() => {
 						haptics.tap();
 						onDismiss();
-						setTimeout(onSearch, 280);
+						setTimeout(onSearch, 180);
 					}}
-					style={({ pressed }) => [styles.searchRow, pressed && styles.pressed]}
+					style={styles.searchRow}
 				>
 					<Feather name="search" size={19} color={t.blue} />
 					<Text style={styles.searchLabel}>Search workers</Text>
@@ -74,12 +76,13 @@ export function WorkerControlsSheet({
 								accessibilityRole="button"
 								accessibilityState={{ selected }}
 								testID={project.id === ALL_WORKER_PROJECTS ? "worker-project-filter" : undefined}
+								android_ripple={{ color: t.tintBlue }}
 								onPress={() => {
 									haptics.select();
 									onSelectProject(project.id);
 									onDismiss();
 								}}
-								style={({ pressed }) => [styles.projectRow, index > 0 && styles.separator, selected && styles.selectedRow, pressed && styles.pressed]}
+								style={[styles.projectRow, index > 0 && styles.separator, selected && styles.selectedRow]}
 							>
 								<Feather name={project.id === ALL_WORKER_PROJECTS ? "layers" : "folder"} size={18} color={selected ? t.blue : t.textSecondary} />
 								<Text numberOfLines={1} style={[styles.projectLabel, selected && styles.selectedLabel]}>{project.name}</Text>
@@ -107,5 +110,4 @@ const makeStyles = (t: Theme) => StyleSheet.create({
 	selectedRow: { backgroundColor: t.tintBlue },
 	projectLabel: { flex: 1, color: t.textPrimary, fontSize: 16, lineHeight: 21 },
 	selectedLabel: { color: t.blue, fontWeight: "700" },
-	pressed: { opacity: 0.7 },
 });

@@ -169,7 +169,7 @@ export function SpawnComposerControls({
 }
 
 const styles = StyleSheet.create({
-	stack: { width: "100%", height: 158, gap: 10 },
+	stack: { width: "100%", height: 150, gap: 2 },
 	controlsHost: { width: "100%", height: 104 },
 	spawnButton: {
 		height: 44,

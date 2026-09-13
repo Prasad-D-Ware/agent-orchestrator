@@ -13,8 +13,11 @@ import {
 	killSession,
 	launchOrchestrator as apiLaunchOrchestrator,
 	mergePR as apiMergePR,
+	pinSession as apiPinSession,
+	renameSession as apiRenameSession,
 	restoreSession,
 	sendMessage,
+	unpinSession as apiUnpinSession,
 	type DashboardPR,
 	type DashboardSession,
 	type DashboardStats,
@@ -65,6 +68,8 @@ type AppState = {
 	 *  rotated tunnel hostname apart from being simply out of range. */
 	activeEndpoints: Endpoint[];
 	projects: ProjectInfo[];
+	/** Whether the current projects value came from the latest daemon response. */
+	projectsKnown: boolean;
 	sessions: DashboardSession[];
 	orchestrators: OrchestratorLink[];
 	orchestratorId: string | null;
@@ -85,6 +90,8 @@ type AppState = {
 	launchConductor: (projectId: string, clean?: boolean, mode?: SessionMode) => Promise<OrchestratorLink>;
 	merge: (pr: DashboardPR) => Promise<void>;
 	kill: (id: string) => Promise<void>;
+	renameWorker: (id: string, displayName: string) => Promise<void>;
+	setWorkerPinned: (id: string, pinned: boolean) => Promise<void>;
 	restore: (id: string) => Promise<void>;
 	send: (id: string, message: string) => Promise<void>;
 };
@@ -121,6 +128,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	const [configResolved, setConfigResolved] = useState(false);
 	const [activeEndpoints, setActiveEndpoints] = useState<Endpoint[]>([]);
 	const [projects, setProjects] = useState<ProjectInfo[]>([]);
+	const [projectsKnown, setProjectsKnown] = useState(false);
 	const [sessions, setSessions] = useState<DashboardSession[]>([]);
 	const [orchestrators, setOrchestrators] = useState<OrchestratorLink[]>([]);
 	const [orchestratorId, setOrchestratorId] = useState<string | null>(null);
@@ -293,7 +301,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			// getSessions returns projects, so don't fetch /projects again alongside
 			// it — that duplicate doubled the auth attempts spent per failing tick.
 			const sess = await getSessions(c, "all");
-			setProjects(sess.projects);
+			setProjects(sess.projects ?? []);
+			setProjectsKnown(sess.projects !== null);
 			setSessions(sess.sessions);
 			setOrchestrators(sess.orchestrators);
 			setOrchestratorId(sess.orchestratorId);
@@ -474,6 +483,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		[fetchAll],
 	);
 
+	const renameWorker = useCallback(
+		async (id: string, displayName: string) => {
+			await apiRenameSession(cfgRef.current!, id, displayName);
+			await fetchAll();
+		},
+		[fetchAll],
+	);
+
+	const setWorkerPinned = useCallback(
+		async (id: string, pinned: boolean) => {
+			await (pinned ? apiPinSession(cfgRef.current!, id) : apiUnpinSession(cfgRef.current!, id));
+			await fetchAll();
+		},
+		[fetchAll],
+	);
+
 	const restore = useCallback(
 		async (id: string) =>
 			trackFeature("restore", async () => {
@@ -498,6 +523,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			configured: !!config && isConfigured(config),
 			activeEndpoints,
 			projects,
+			projectsKnown,
 			sessions,
 			orchestrators,
 			orchestratorId,
@@ -515,12 +541,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			launchConductor,
 			merge,
 			kill,
+			renameWorker,
+			setWorkerPinned,
 			restore,
 			send,
 		}),
 		[
 			config,
 			projects,
+			projectsKnown,
 			sessions,
 			orchestrators,
 			orchestratorId,
@@ -538,6 +567,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			launchConductor,
 			merge,
 			kill,
+			renameWorker,
+			setWorkerPinned,
 			restore,
 			send,
 		],

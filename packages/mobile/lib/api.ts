@@ -689,6 +689,22 @@ export async function killSession(cfg: ServerConfig, id: string): Promise<void> 
 	await req(cfg, `${API}/sessions/${encodeURIComponent(id)}/kill`, { method: "POST" });
 }
 
+/** Rename the worker shown on the board without changing its conversation history. */
+export async function renameSession(cfg: ServerConfig, id: string, displayName: string): Promise<void> {
+	await req(cfg, `${API}/sessions/${encodeURIComponent(id)}`, {
+		method: "PATCH",
+		body: JSON.stringify({ displayName }),
+	});
+}
+
+export async function pinSession(cfg: ServerConfig, id: string): Promise<void> {
+	await req(cfg, `${API}/sessions/${encodeURIComponent(id)}/pin`, { method: "POST" });
+}
+
+export async function unpinSession(cfg: ServerConfig, id: string): Promise<void> {
+	await req(cfg, `${API}/sessions/${encodeURIComponent(id)}/pin`, { method: "DELETE" });
+}
+
 export async function restoreSession(cfg: ServerConfig, id: string): Promise<void> {
 	await req(cfg, `${API}/sessions/${encodeURIComponent(id)}/restore`, { method: "POST" });
 }

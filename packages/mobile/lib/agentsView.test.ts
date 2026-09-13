@@ -22,7 +22,7 @@ const pr = (over: Partial<DashboardPR> = {}): DashboardPR => ({ number: 1, url: 
 
 describe("boardZoneOf", () => {
 	it("puts user-action sections ahead of passive work", () => {
-		expect(BOARD_ZONES).toEqual(["action", "merge", "working", "pending"]);
+		expect(BOARD_ZONES).toEqual(["action", "merge", "working", "pending", "active"]);
 	});
 
 	// Desktop files ci_failed and changes_requested under "Needs you" rather than
@@ -40,7 +40,9 @@ describe("boardZoneOf", () => {
 		expect(boardZoneOf(session({ status: "pr_open" }))).toBe("pending");
 		expect(boardZoneOf(session({ status: "review_pending" }))).toBe("pending");
 		expect(boardZoneOf(session({ status: "working" }))).toBe("working");
-		expect(boardZoneOf(session({ status: "idle" }))).toBe("working");
+		expect(boardZoneOf(session({ status: "detecting" }))).toBe("working");
+		expect(boardZoneOf(session({ status: "idle" }))).toBe("active");
+		expect(boardZoneOf(session({ status: null }))).toBe("active");
 	});
 });
 
@@ -51,6 +53,7 @@ describe("zoneMeta", () => {
 			"Ready to merge",
 			"Working",
 			"In review",
+			"Active",
 		]);
 	});
 
@@ -81,6 +84,15 @@ describe("isArchived", () => {
 });
 
 describe("groupSessions", () => {
+	it("lifts pinned live workers into a dedicated top section without duplicating them", () => {
+		const { pinned, sections } = groupSessions(darkTheme, [
+			session({ id: "pinned", status: "working", isPinned: true }),
+			session({ id: "working", status: "working" }),
+		]);
+		expect(pinned.map((item) => item.id)).toEqual(["pinned"]);
+		expect(sections.flatMap((section) => section.data).map((item) => item.id)).toEqual(["working"]);
+	});
+
 	it("splits the board from the archive", () => {
 		const { sections, archived } = groupSessions(darkTheme, [
 			session({ id: "a", status: "working" }),
@@ -93,9 +105,9 @@ describe("groupSessions", () => {
 
 	// A run of empty section titles is most of a phone screen.
 	it("drops empty zones rather than rendering empty headers", () => {
-		const { sections } = groupSessions(darkTheme, [session({ status: "working" })]);
+		const { sections } = groupSessions(darkTheme, [session({ status: "idle" })]);
 		expect(sections).toHaveLength(1);
-		expect(sections[0].label).toBe("Working");
+		expect(sections[0].label).toBe("Active");
 	});
 
 	it("keeps sections in action-first order regardless of input order", () => {
@@ -107,12 +119,13 @@ describe("groupSessions", () => {
 		expect(sections.map((s) => s.zone)).toEqual(["merge", "working", "pending"]);
 	});
 
-	it("puts pinned sessions first within their section", () => {
-		const { sections } = groupSessions(darkTheme, [
+	it("separates pinned sessions from their normal section", () => {
+		const { pinned, sections } = groupSessions(darkTheme, [
 			session({ id: "recent", status: "working", lastActivityAt: "2026-08-09T10:00:00Z" }),
 			session({ id: "pinned", status: "working", isPinned: true, lastActivityAt: "2026-01-01T00:00:00Z" }),
 		]);
-		expect(sections[0].data.map((s) => s.id)).toEqual(["pinned", "recent"]);
+		expect(pinned.map((s) => s.id)).toEqual(["pinned"]);
+		expect(sections[0].data.map((s) => s.id)).toEqual(["recent"]);
 	});
 
 	it.each([
@@ -120,6 +133,7 @@ describe("groupSessions", () => {
 		["Ready to merge", "mergeable", ["old", "new"]],
 		["Working", "working", ["new", "old"]],
 		["In review", "pr_open", ["old", "new"]],
+		["Active", "idle", ["new", "old"]],
 	] as const)("orders %s sessions by the useful activity direction", (_label, status, expected) => {
 		const { sections } = groupSessions(darkTheme, [
 			session({ id: "new", status, lastActivityAt: "2026-08-09T10:00:00Z" }),
@@ -153,7 +167,7 @@ describe("groupSessions", () => {
 	});
 
 	it("returns nothing for an empty board", () => {
-		expect(groupSessions(darkTheme, [])).toEqual({ sections: [], archived: [] });
+		expect(groupSessions(darkTheme, [])).toEqual({ pinned: [], sections: [], archived: [] });
 	});
 });
 

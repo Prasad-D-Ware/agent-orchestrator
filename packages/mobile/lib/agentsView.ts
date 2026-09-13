@@ -11,11 +11,11 @@ import { prLifecycle, type Tone } from "./prView";
 import { attentionOf, sessionTitle } from "./sessionStatus";
 import { statusVisual, type Theme } from "./theme";
 
-/** The four board columns, as desktop names them. */
-export type BoardZone = "working" | "action" | "pending" | "merge";
+/** The live board sections, separating active-but-idle workers from work in progress. */
+export type BoardZone = "active" | "working" | "action" | "pending" | "merge";
 
 /** Mobile's action-first section order. */
-export const BOARD_ZONES: BoardZone[] = ["action", "merge", "working", "pending"];
+export const BOARD_ZONES: BoardZone[] = ["action", "merge", "working", "pending", "active"];
 
 /**
  * Which column a session belongs in.
@@ -39,10 +39,12 @@ export function boardZoneOf(session: DashboardSession): BoardZone {
 		case "review":
 			return "action";
 		default:
-			// `working` and `done`. A session only reaches here as `done` when it is
-			// finished but its runtime is still alive — a dead one is archived
-			// before zoning, see isArchived.
-			return "working";
+			// Attention deliberately folds all healthy runtimes into `working`.
+			// The board still needs to distinguish an agent executing right now from
+			// a live runtime waiting for its next request.
+			return session.status === "working" || session.status === "detecting" || session.status === "spawning"
+				? "working"
+				: "active";
 	}
 }
 
@@ -54,6 +56,8 @@ export function zoneMeta(t: Theme, zone: BoardZone): { label: string; color: str
 			return { label: "Needs you", color: t.amber };
 		case "pending":
 			return { label: "In review", color: t.textTertiary };
+		case "active":
+			return { label: "Active", color: t.textTertiary };
 		default:
 			return { label: "Working", color: t.orange };
 	}
@@ -128,7 +132,7 @@ function compareActivity(a: DashboardSession, b: DashboardSession, newestFirst: 
 }
 
 function compareInZone(zone: BoardZone, a: DashboardSession, b: DashboardSession): number {
-	return comparePinned(a, b) || compareActivity(a, b, zone === "working");
+	return compareActivity(a, b, zone === "working" || zone === "active");
 }
 
 /**
@@ -140,10 +144,18 @@ function compareInZone(zone: BoardZone, a: DashboardSession, b: DashboardSession
 export function groupSessions(
 	t: Theme,
 	sessions: DashboardSession[],
-): { sections: BoardSection[]; archived: DashboardSession[] } {
+): { pinned: DashboardSession[]; sections: BoardSection[]; archived: DashboardSession[] } {
+	const pinned: DashboardSession[] = [];
 	const live: DashboardSession[] = [];
 	const archived: DashboardSession[] = [];
-	for (const s of sessions) (isArchived(s) ? archived : live).push(s);
+	for (const s of sessions) {
+		if (isArchived(s)) archived.push(s);
+		else if (s.isPinned) pinned.push(s);
+		else live.push(s);
+	}
+	// Pinning is a deliberate bookmark, so the most recently pinned worker gets
+	// the first slot. Activity is the fallback for older daemon versions.
+	pinned.sort((a, b) => (b.pinnedAt ?? b.lastActivityAt ?? "").localeCompare(a.pinnedAt ?? a.lastActivityAt ?? ""));
 
 	const byZone = new Map<BoardZone, DashboardSession[]>();
 	for (const s of live) {
@@ -161,7 +173,7 @@ export function groupSessions(
 
 	// Pin history deliberately kept close, then show the newest remaining history.
 	archived.sort((a, b) => comparePinned(a, b) || compareActivity(a, b, true));
-	return { sections, archived };
+	return { pinned, sections, archived };
 }
 
 /**

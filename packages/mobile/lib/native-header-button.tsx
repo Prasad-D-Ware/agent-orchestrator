@@ -1,7 +1,7 @@
 import { Button, Host } from "@expo/ui";
 import { useTheme, useThemeState } from "./ThemeProvider";
 
-export type NativeHeaderButtonIcon = "menu" | "bell" | "close";
+export type NativeHeaderButtonIcon = "menu" | "bell" | "close" | "check" | "back";
 
 export function NativeHeaderButton({
 	icon,
@@ -17,7 +17,7 @@ export function NativeHeaderButton({
 	return (
 		<Host style={{ width: 44, height: 44 }} colorScheme={scheme} seedColor={t.blue}>
 			<Button
-				label={icon === "menu" ? "☰" : icon === "close" ? "×" : "◉"}
+				label={icon === "menu" ? "☰" : icon === "close" ? "×" : icon === "check" ? "✓" : icon === "back" ? "‹" : "◉"}
 				onPress={onPress}
 				variant="outlined"
 				testID={`header-${icon}`}

@@ -12,7 +12,15 @@ import { useTheme, useThemeState } from "./ThemeProvider";
 import type { NativeHeaderButtonIcon } from "./native-header-button";
 
 const systemImage = (icon: NativeHeaderButtonIcon) =>
-	icon === "menu" ? "line.3.horizontal" : icon === "close" ? "xmark" : "bell";
+	icon === "menu"
+		? "line.3.horizontal"
+		: icon === "close"
+			? "xmark"
+			: icon === "check"
+				? "checkmark"
+				: icon === "back"
+					? "chevron.left"
+					: "bell";
 
 export function NativeHeaderButton({
 	icon,

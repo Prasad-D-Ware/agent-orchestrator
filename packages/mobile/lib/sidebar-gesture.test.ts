@@ -11,6 +11,10 @@ describe("sidebar edge gesture", () => {
 		expect(shouldCaptureSidebarGesture({ open: false, startX: 18, dx: 4, dy: 20 })).toBe(false);
 	});
 
+	it("supports a wider Android activation strip outside the system back edge", () => {
+		expect(shouldCaptureSidebarGesture({ open: false, startX: 52, dx: 18, dy: 2, edgeWidth: 64 })).toBe(true);
+	});
+
 	it("captures a leftward horizontal drag to dismiss an open sidebar", () => {
 		expect(shouldCaptureSidebarGesture({ open: true, startX: 280, dx: -14, dy: 2 })).toBe(true);
 	});

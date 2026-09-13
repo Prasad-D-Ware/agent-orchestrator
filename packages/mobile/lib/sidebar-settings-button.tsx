@@ -16,7 +16,7 @@ export function SidebarSettingsButton({ active, onPress }: { active: boolean; on
 					width: 48,
 					height: 48,
 					borderRadius: 24,
-					backgroundColor: active ? t.tintBlue : t.bgSubtle,
+					backgroundColor: active ? t.tintBlue : "transparent",
 				}}
 			>
 				<SidebarDestinationIcon
