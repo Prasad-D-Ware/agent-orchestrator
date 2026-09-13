@@ -8,6 +8,9 @@ import {
 	orchestratorStatus,
 	orchestratorWorkerAccessibilityLabel,
 	orchestratorWorkerPreviews,
+	projectBlockerLine,
+	projectRailTone,
+	projectRowChips,
 	workersOf,
 	zoneCounts,
 } from "./orchestratorView";
@@ -34,6 +37,115 @@ const rowByProject = (
 	if (!row) throw new Error(`Missing project row ${projectId}`);
 	return row;
 };
+
+describe("projectRowChips", () => {
+	const rowFor = (sessions: DashboardSession[]) =>
+		rowByProject(orchestratorProjectSections([project("proj")], sessions, [link()]), "proj");
+
+	it("promotes the counts that detailFor spends on prose", () => {
+		const chips = projectRowChips(
+			rowFor([
+				session({ id: "a", status: "needs_input" }),
+				session({ id: "b", status: "needs_input" }),
+				session({ id: "c", status: "ci_failed" }),
+			]),
+		);
+		expect(chips.map((chip) => chip.id)).toEqual(["needs-you", "failing"]);
+		expect(chips[0]).toEqual({ id: "needs-you", label: "2 need you", tone: "attention" });
+	});
+
+	it("says 'needs' for one and 'need' for many", () => {
+		const one = projectRowChips(rowFor([session({ id: "a", status: "needs_input" })]));
+		expect(one[0].label).toBe("1 needs you");
+	});
+
+	// A row should carry only facts that are true of it — "0 failing" is noise.
+	it("drops zero counts rather than rendering them", () => {
+		const chips = projectRowChips(rowFor([session({ id: "a", status: "running" })]));
+		expect(chips.every((chip) => !chip.label.startsWith("0"))).toBe(true);
+	});
+
+	it("never returns more than three, keeping the most urgent", () => {
+		const chips = projectRowChips(
+			rowFor([
+				session({ id: "a", status: "needs_input" }),
+				session({ id: "b", status: "ci_failed" }),
+				session({ id: "c", status: "mergeable" }),
+				session({ id: "d", status: "running" }),
+			]),
+		);
+		expect(chips.length).toBeLessThanOrEqual(3);
+		expect(chips[0].id).toBe("needs-you");
+	});
+
+	it("shows nothing for a project whose orchestrator is not running", () => {
+		const rows = orchestratorProjectSections([project("proj")], [], []);
+		expect(projectRowChips(rowByProject(rows, "proj"))).toEqual([]);
+	});
+});
+
+describe("projectBlockerLine", () => {
+	const now = Date.parse("2026-01-01T12:00:00.000Z");
+	const ago = (mins: number) => new Date(now - mins * 60_000).toISOString();
+
+	// The bug this function exists for: the attention section suppressed `detail`,
+	// so the most urgent rows were the ones saying the least.
+	it("names the worker, why it is blocked, and for how long", () => {
+		const rows = orchestratorProjectSections(
+			[project("proj")],
+			[session({ id: "auth-refactor", displayName: "auth-refactor", status: "needs_input", lastActivityAt: ago(12) })],
+			[link()],
+		);
+		expect(projectBlockerLine(rowByProject(rows, "proj"), now)).toEqual({
+			worker: "auth-refactor",
+			reason: "waiting on your reply",
+			age: "12m",
+		});
+	});
+
+	it("names the worker that has been blocked longest", () => {
+		const rows = orchestratorProjectSections(
+			[project("proj")],
+			[
+				session({ id: "new", displayName: "new", status: "needs_input", lastActivityAt: ago(2) }),
+				session({ id: "old", displayName: "old", status: "needs_input", lastActivityAt: ago(90) }),
+			],
+			[link()],
+		);
+		expect(projectBlockerLine(rowByProject(rows, "proj"), now)?.worker).toBe("old");
+	});
+
+	it("stays silent outside the attention section", () => {
+		const rows = orchestratorProjectSections([project("proj")], [session({ id: "a", status: "running" })], [link()]);
+		expect(projectBlockerLine(rowByProject(rows, "proj"), now)).toBeNull();
+	});
+});
+
+describe("projectRailTone", () => {
+	const toneFor = (sessions: DashboardSession[], links: OrchestratorLink[] = [link()]) =>
+		projectRailTone(rowByProject(orchestratorProjectSections([project("proj")], sessions, links), "proj"));
+
+	it("reports stopped when nothing is running", () => {
+		expect(toneFor([], [])).toBe("stopped");
+	});
+
+	it("puts a blocked worker ahead of a busy one", () => {
+		expect(toneFor([session({ id: "a", status: "running" }), session({ id: "b", status: "needs_input" })]))
+			.toBe("attention");
+	});
+
+	it("reports review when checks are failing", () => {
+		expect(toneFor([session({ id: "a", status: "ci_failed" })])).toBe("review");
+	});
+
+	it("reports working when work is merely in flight", () => {
+		expect(toneFor([session({ id: "a", status: "running" })])).toBe("working");
+	});
+
+	it("reports idle for a running orchestrator with nothing to do", () => {
+		expect(toneFor([])).toBe("idle");
+	});
+});
 
 describe("orchestratorState", () => {
 	it("reports missing when there is no link at all", () => {
