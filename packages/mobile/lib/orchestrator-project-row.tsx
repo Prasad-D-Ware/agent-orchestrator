@@ -93,11 +93,20 @@ export function OrchestratorProjectRowView({
 			{/* Line 3 — the specific blocker, on attention rows only. This is what
 			    the row was missing: which worker, waiting on what, how long. */}
 			{blocker ? (
-				<Text style={styles.blocker} numberOfLines={1}>
-					<Text style={styles.blockerWorker}>{blocker.worker}</Text>
-					{` · ${blocker.reason}`}
-					{blocker.age ? ` · ${blocker.age}` : ""}
-				</Text>
+				// Two texts rather than one, so the ellipsis falls on the worker name
+				// instead of the tail. A single truncating Text clipped the age — the
+				// most perishable part of the line, and the reason it is worth showing
+				// at all. The name is the one part repeated in the worker list below,
+				// so it is the safe thing to shorten.
+				<View style={styles.blockerRow}>
+					<Text style={styles.blockerWorker} numberOfLines={1}>
+						{blocker.worker}
+					</Text>
+					<Text style={styles.blocker} numberOfLines={1}>
+						{` · ${blocker.reason}`}
+						{blocker.age ? ` · ${blocker.age}` : ""}
+					</Text>
+				</View>
 			) : null}
 		</>
 	);
@@ -190,8 +199,10 @@ const makeStyles = (t: Theme) =>
 		status: { flexShrink: 0, fontSize: 12, lineHeight: 16, fontWeight: "600" },
 		detail: { flex: 1, color: t.textTertiary, fontSize: 12, lineHeight: 16 },
 
-		blocker: { color: t.textTertiary, fontSize: 12, lineHeight: 16 },
-		blockerWorker: { color: t.textPrimary, fontWeight: "600" },
+		blockerRow: { flexDirection: "row", alignItems: "center", minWidth: 0 },
+		// flexShrink on the name, none on the reason+age: the tail must survive.
+		blocker: { flexShrink: 0, color: t.textTertiary, fontSize: 12, lineHeight: 16 },
+		blockerWorker: { flexShrink: 1, color: t.textPrimary, fontSize: 12, lineHeight: 16, fontWeight: "600" },
 
 		workerList: { paddingLeft: 27, paddingRight: 14, paddingBottom: 8 },
 		workerRail: { position: "absolute", left: 15, top: 0, bottom: 16, width: StyleSheet.hairlineWidth, backgroundColor: t.borderSubtle },
