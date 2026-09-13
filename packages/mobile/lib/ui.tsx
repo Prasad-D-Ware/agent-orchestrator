@@ -18,6 +18,7 @@ import { BREATHE_MS, shouldBreathe } from "./motion";
 import { NativeHeaderButton, type NativeHeaderButtonIcon } from "./native-header-button";
 import { useOptionalSidebarNavigation } from "./sidebar-navigation-shell";
 import { useReducedMotion } from "./useReducedMotion";
+import { fontScaleCap } from "./tokens";
 import type { ConnStatus } from "./store";
 import { statusVisual, type Theme } from "./theme";
 import { useTheme, useThemedStyles } from "./ThemeProvider";
@@ -107,7 +108,11 @@ export function Pill({
 			}}
 			style={[s.pill, active && s.pillActive, style]}
 		>
-			<Text numberOfLines={1} style={[s.pillText, active && s.pillTextActive, textStyle]}>
+			<Text
+				numberOfLines={1}
+				maxFontSizeMultiplier={fontScaleCap.chrome}
+				style={[s.pillText, active && s.pillTextActive, textStyle]}
+			>
 				{label}
 			</Text>
 		</Pressable>
@@ -121,7 +126,9 @@ export function StatusBadge({ status }: { status?: string | null }) {
 	return (
 		<View style={s.badge}>
 			<Dot color={v.color} breathing={v.breathing} size={8} />
-			<Text style={[s.badgeText, { color: v.color }]}>{v.label}</Text>
+			<Text maxFontSizeMultiplier={fontScaleCap.chrome} style={[s.badgeText, { color: v.color }]}>
+				{v.label}
+			</Text>
 		</View>
 	);
 }
@@ -148,7 +155,11 @@ export function Chip({
 	return (
 		<View style={[s.chip, { backgroundColor: bg }]}>
 			{icon ? <Feather name={icon} size={11} color={fg} style={{ marginRight: 4 }} /> : null}
-			<Text style={[s.chipText, { color: fg }, mono && { fontFamily: t.fontMono, fontSize: 11 }]} numberOfLines={1}>
+			<Text
+				style={[s.chipText, { color: fg }, mono && { fontFamily: t.fontMono, fontSize: 11 }]}
+				numberOfLines={1}
+				maxFontSizeMultiplier={fontScaleCap.chrome}
+			>
 				{label}
 			</Text>
 		</View>
@@ -184,8 +195,14 @@ export function SectionHeader({ label, color, count }: { label: string; color: s
 	return (
 		<View style={s.sectionHeader}>
 			<View style={[s.sectionBar, { backgroundColor: color }]} />
-			<Text style={s.sectionLabel}>{label.toUpperCase()}</Text>
-			{count !== undefined ? <Text style={s.sectionCount}>{count}</Text> : null}
+			<Text maxFontSizeMultiplier={fontScaleCap.chrome} style={s.sectionLabel}>
+				{label.toUpperCase()}
+			</Text>
+			{count !== undefined ? (
+				<Text maxFontSizeMultiplier={fontScaleCap.chrome} style={s.sectionCount}>
+					{count}
+				</Text>
+			) : null}
 		</View>
 	);
 }
@@ -275,11 +292,17 @@ export function ScreenHeader({
 			{left ?? (sidebar ? <HeaderIconButton icon="menu" label="Open navigation" onPress={sidebar.openSidebar} /> : null)}
 			<View style={{ flex: 1 }}>
 				<View style={s.titleRow}>
-					<Text style={s.screenTitle}>{title}</Text>
+					<Text maxFontSizeMultiplier={fontScaleCap.title} style={s.screenTitle}>
+						{title}
+					</Text>
 					<MascotLamp status={status} />
 				</View>
 				{subtitle ? (
-					<Text style={s.screenSubtitle} numberOfLines={1}>
+					<Text
+						style={s.screenSubtitle}
+						numberOfLines={1}
+						maxFontSizeMultiplier={fontScaleCap.chrome}
+					>
 						{subtitle}
 					</Text>
 				) : null}
@@ -293,7 +316,9 @@ export function ListSectionHeader({ label }: { label: string }) {
 	const s = useThemedStyles(makeStyles);
 	return (
 		<View style={s.listSectionHeader}>
-			<Text style={s.listSectionLabel}>{label}</Text>
+			<Text maxFontSizeMultiplier={fontScaleCap.chrome} style={s.listSectionLabel}>
+				{label}
+			</Text>
 			<View style={s.listSectionRule} />
 		</View>
 	);
@@ -347,7 +372,9 @@ export function Button({
 			) : (
 				<View style={s.btnInner}>
 					{icon ? <Feather name={icon} size={15} color={fg} style={{ marginRight: 7 }} /> : null}
-					<Text style={[s.btnText, { color: fg }]}>{title}</Text>
+					<Text maxFontSizeMultiplier={fontScaleCap.body} style={[s.btnText, { color: fg }]}>
+						{title}
+					</Text>
 				</View>
 			)}
 		</Pressable>
@@ -521,7 +548,11 @@ export function SettingsRow({
 	const body = (
 		<>
 			{icon ? <Feather name={icon} size={17} color={iconColor} style={s.rowIcon} /> : null}
-			<Text style={[s.rowLabel, { color: labelColor }]} numberOfLines={1}>
+			<Text
+				style={[s.rowLabel, { color: labelColor }]}
+				numberOfLines={1}
+				maxFontSizeMultiplier={fontScaleCap.body}
+			>
 				{label}
 			</Text>
 			{right ?? (
@@ -529,7 +560,11 @@ export function SettingsRow({
 					{loading ? <ActivityIndicator size="small" color={t.textTertiary} /> : null}
 					{!loading && leading ? leading : null}
 					{!loading && value ? (
-						<Text style={[s.rowValue, valueColor ? { color: valueColor } : null]} numberOfLines={1}>
+						<Text
+							style={[s.rowValue, valueColor ? { color: valueColor } : null]}
+							numberOfLines={1}
+							maxFontSizeMultiplier={fontScaleCap.chrome}
+						>
 							{value}
 						</Text>
 					) : null}
@@ -667,8 +702,14 @@ export function EmptyState({
 			<View style={s.emptyIcon}>
 				<Feather name={icon} size={26} color={t.textTertiary} />
 			</View>
-			<Text style={s.emptyTitle}>{title}</Text>
-			{message ? <Text style={s.emptyMsg}>{message}</Text> : null}
+			<Text maxFontSizeMultiplier={fontScaleCap.body} style={s.emptyTitle}>
+				{title}
+			</Text>
+			{message ? (
+				<Text maxFontSizeMultiplier={fontScaleCap.body} style={s.emptyMsg}>
+					{message}
+				</Text>
+			) : null}
 			{action ? <View style={{ marginTop: 18 }}>{action}</View> : null}
 		</View>
 	);
