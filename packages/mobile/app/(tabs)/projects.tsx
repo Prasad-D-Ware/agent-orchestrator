@@ -14,7 +14,7 @@ import { UnpairedState } from "../../lib/UnpairedState";
 import type { Theme } from "../../lib/theme";
 import { useTheme, useThemedStyles } from "../../lib/ThemeProvider";
 import { useTabScrollToTop } from "../../lib/useTabScrollToTop";
-import { Button, EmptyState, HeaderIconButton, ScreenHeader } from "../../lib/ui";
+import { Button, EmptyState, HeaderIconButton, ListSectionHeader, ScreenHeader } from "../../lib/ui";
 
 export default function ProjectsScreen() {
 	const t = useTheme();
@@ -166,7 +166,9 @@ export default function ProjectsScreen() {
 					contentContainerStyle={{ paddingBottom: insets.bottom + 92 }}
 					stickySectionHeadersEnabled={false}
 					refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.blue} />}
-					renderSectionHeader={({ section }) => <ProjectSectionHeader label={section.title} />}
+					renderSectionHeader={({ section }) => (
+						<ListSectionHeader label={section.title} count={section.data.length} />
+					)}
 					renderItem={({ item }) => (
 						<OrchestratorProjectRowView
 							row={item}
@@ -194,28 +196,8 @@ export default function ProjectsScreen() {
 	);
 }
 
-function ProjectSectionHeader({ label }: { label: string }) {
-	const styles = useThemedStyles(makeStyles);
-	return (
-		<View style={styles.sectionHeader}>
-			<Text style={styles.sectionLabel}>{label}</Text>
-			<View style={styles.sectionRule} />
-		</View>
-	);
-}
-
 const makeStyles = (t: Theme) =>
 	StyleSheet.create({
 		screen: { flex: 1, backgroundColor: t.bgBase },
 		center: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 60 },
-		sectionHeader: {
-			flexDirection: "row",
-			alignItems: "center",
-			gap: 10,
-			paddingHorizontal: 18,
-			paddingTop: 18,
-			paddingBottom: 5,
-		},
-		sectionLabel: { color: t.textTertiary, fontSize: 12, lineHeight: 16, fontWeight: "500" },
-		sectionRule: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: t.borderSubtle },
 	});
