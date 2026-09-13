@@ -2,6 +2,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { OnboardingGate } from "../lib/OnboardingGate";
 import { TelemetryManager } from "../lib/TelemetryManager";
@@ -61,13 +62,19 @@ export default function RootLayout() {
 	// consume a provider its own component renders.
 	return (
 		<GestureHandlerRootView style={{ flex: 1 }}>
-			<SafeAreaProvider>
-				<ThemeProvider>
-					<AppProvider>
-						<Shell />
-					</AppProvider>
-				</ThemeProvider>
-			</SafeAreaProvider>
+			{/* Sits above everything that positions itself against the keyboard. It
+			    reports the IME frame-by-frame, which the platform listeners cannot:
+			    Android only fires `keyboardDidShow` once the keyboard has finished
+			    animating, so every dock and composer arrived a beat late. */}
+			<KeyboardProvider>
+				<SafeAreaProvider>
+					<ThemeProvider>
+						<AppProvider>
+							<Shell />
+						</AppProvider>
+					</ThemeProvider>
+				</SafeAreaProvider>
+			</KeyboardProvider>
 		</GestureHandlerRootView>
 	);
 }
