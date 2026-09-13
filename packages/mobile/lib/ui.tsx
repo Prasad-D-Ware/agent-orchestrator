@@ -1026,7 +1026,7 @@ const makeStyles = (t: Theme) =>
  * orchestrator's project card.
  *
  * These three had byte-identical style blocks, each with a comment
- * acknowledging the duplication ("Matches SessionCard's shell so a PR card and
+ * acknowledging the duplication ("Matches the session card shell so a PR card and
  * a session card read as siblings"). Comments cannot keep them in step — a
  * radius changed in one place would quietly make one card a different shape
  * from its neighbours in the same scroll view. This is what those comments were

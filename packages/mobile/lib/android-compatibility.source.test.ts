@@ -66,7 +66,6 @@ describe("Android native compatibility boundaries", () => {
 		expect(android).not.toContain("Picker");
 		expect(android).not.toContain("@expo/ui");
 		expect(android).toContain("AgentLogo");
-		expect(source("../app/project/[id].tsx")).not.toContain('style={{ width: "100%"');
 	});
 
 	it("uses a rounded native Android attachment chooser instead of the square popup menu", () => {
