@@ -9,7 +9,9 @@ import { PRCard } from "../../lib/PRCard";
 import { PRFilterDock } from "../../lib/pr-filter-dock";
 import { ProjectSwitcher } from "../../lib/ProjectSwitcher";
 import { prLifecycle, prListSections, type PRListFilter } from "../../lib/prView";
+import { StaleBanner } from "../../lib/StaleBanner";
 import { useApp, usePRs } from "../../lib/store";
+import { UnpairedState } from "../../lib/UnpairedState";
 import { usePRSummaries } from "../../lib/usePRSummaries";
 import { useTabScrollToTop } from "../../lib/useTabScrollToTop";
 import { Button, EmptyState, HeaderIconButton, ListSectionHeader, ScreenHeader } from "../../lib/ui";
@@ -74,7 +76,7 @@ export default function PRsScreen() {
 				    screen dropped it, so the tab lost its title and connection lamp exactly
 				    when a user most needs to know what they are looking at. */}
 				<ScreenHeader title="Pull Requests" status={connection} />
-				<EmptyState icon="git-pull-request" title="No server" message="Connect to AO in Settings." />
+				<UnpairedState />
 			</View>
 		);
 	}
@@ -102,6 +104,7 @@ export default function PRsScreen() {
 				}
 			/>
 			<ProjectSwitcher />
+			<StaleBanner error={!!error} onRetry={onRefresh} />
 
 			{loading && prs.length === 0 ? (
 				<View style={styles.center}>

@@ -8,7 +8,9 @@ import { classifyConnectionFailure, describeConnectionFailure } from "../../lib/
 import { tunnelMayHaveRotated } from "../../lib/staleTunnel";
 import { haptics } from "../../lib/haptics";
 import { groupSessions, type BoardSection } from "../../lib/agentsView";
+import { StaleBanner } from "../../lib/StaleBanner";
 import { useApp } from "../../lib/store";
+import { UnpairedState } from "../../lib/UnpairedState";
 import type { Theme } from "../../lib/theme";
 import { statusVisual } from "../../lib/theme";
 import { useTheme, useThemedStyles } from "../../lib/ThemeProvider";
@@ -227,17 +229,7 @@ export default function FleetScreen() {
 			<View style={styles.screen}>
 				<View style={{ height: insets.top }} />
 				<ScreenHeader title="Workers" status={connection} />
-				<EmptyState
-					icon="server"
-					// Where a user who skipped onboarding lands. Deliberately not a
-					// restatement of the welcome screen — they've already read that and
-					// chosen to move past it. This says what is missing and offers the
-					// one action that fixes it, going straight to the scanner rather
-					// than sending them to Settings to hunt for a field.
-					title="No desktop paired"
-					message="Scan the pairing code from AO → Settings → Connect Mobile to drive your agents from here."
-					action={<Button title="Scan pairing code" icon="maximize" onPress={() => router.push("/pair")} />}
-				/>
+				<UnpairedState />
 			</View>
 		);
 	}
@@ -258,6 +250,9 @@ export default function FleetScreen() {
 					/>
 				}
 			/>
+			{/* Above the list rather than inside ListEmptyComponent: the case this
+			    exists for is a populated board whose poll has died. */}
+			<StaleBanner error={!!error} onRetry={onRefresh} />
 
 			{loading && sessions.length === 0 ? (
 				<View style={styles.center}>
