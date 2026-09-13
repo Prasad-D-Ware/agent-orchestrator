@@ -14,8 +14,10 @@ import {
 	type ViewStyle,
 } from "react-native";
 import { haptics } from "./haptics";
+import { BREATHE_MS, shouldBreathe } from "./motion";
 import { NativeHeaderButton, type NativeHeaderButtonIcon } from "./native-header-button";
 import { useOptionalSidebarNavigation } from "./sidebar-navigation-shell";
+import { useReducedMotion } from "./useReducedMotion";
 import type { ConnStatus } from "./store";
 import { statusVisual, type Theme } from "./theme";
 import { useTheme, useThemedStyles } from "./ThemeProvider";
@@ -35,25 +37,38 @@ export const Dot = memo(function Dot({
 	breathing?: boolean;
 }) {
 	const pulse = useRef(new Animated.Value(1)).current;
+	// Consumed here rather than at the call sites: this is the most-repeated
+	// animation in the app, so honouring the setting once inside the primitive
+	// fixes every `<Dot breathing>` — status badges, the connection lamp, project
+	// rows — without touching any of them.
+	const reduceMotion = useReducedMotion();
+	const animate = shouldBreathe(reduceMotion, breathing);
 	useEffect(() => {
-		if (!breathing) return;
+		// Deliberately not a zero duration: a zero-length loop is a busy loop, so
+		// the animation must not start at all.
+		if (!animate) return;
 		const loop = Animated.loop(
 			Animated.sequence([
 				Animated.timing(pulse, {
 					toValue: 0.35,
-					duration: 1200,
+					duration: BREATHE_MS,
 					useNativeDriver: true,
 				}),
 				Animated.timing(pulse, {
 					toValue: 1,
-					duration: 1200,
+					duration: BREATHE_MS,
 					useNativeDriver: true,
 				}),
 			]),
 		);
 		loop.start();
-		return () => loop.stop();
-	}, [breathing, pulse]);
+		return () => {
+			loop.stop();
+			// Leave the dot at full opacity; a stopped loop otherwise freezes it
+			// mid-fade, which reads as a rendering bug rather than a resting state.
+			pulse.setValue(1);
+		};
+	}, [animate, pulse]);
 
 	return (
 		<Animated.View
@@ -62,7 +77,7 @@ export const Dot = memo(function Dot({
 				height: size,
 				borderRadius: size / 2,
 				backgroundColor: color,
-				opacity: breathing ? pulse : 1,
+				opacity: animate ? pulse : 1,
 			}}
 		/>
 	);
