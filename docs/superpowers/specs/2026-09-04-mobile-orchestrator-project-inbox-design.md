@@ -1,6 +1,6 @@
 # Mobile Orchestrator Project Inbox Design
 
-**Date:** 2026-09-04  
+**Date:** 2026-09-04
 **Status:** Awaiting written-spec review
 
 ## Goal

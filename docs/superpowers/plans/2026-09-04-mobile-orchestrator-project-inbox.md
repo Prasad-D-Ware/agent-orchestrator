@@ -85,7 +85,7 @@ expect(rowByProject(sections, "stopped").action).toBe("resume");
 
 - [ ] **Step 2: Run the focused tests and confirm RED**
 
-Run: `cd packages/mobile && npm test -- lib/orchestratorView.test.ts`  
+Run: `cd packages/mobile && npm test -- lib/orchestratorView.test.ts`
 Expected: FAIL because `orchestratorProjectSections` and exported row types do not exist.
 
 - [ ] **Step 3: Implement classification and one-row-per-project mapping**
@@ -119,12 +119,12 @@ Use small pure helpers such as `plural`, `latestActivityAt`, `attentionActivityA
 
 - [ ] **Step 6: Run focused tests and confirm GREEN**
 
-Run: `cd packages/mobile && npm test -- lib/orchestratorView.test.ts`  
+Run: `cd packages/mobile && npm test -- lib/orchestratorView.test.ts`
 Expected: PASS, including all existing lifecycle, launch-intent, status, worker-matching, and zone-count tests.
 
 - [ ] **Step 7: Review the focused diff**
 
-Run: `git diff -- packages/mobile/lib/orchestratorView.ts packages/mobile/lib/orchestratorView.test.ts`  
+Run: `git diff -- packages/mobile/lib/orchestratorView.ts packages/mobile/lib/orchestratorView.test.ts`
 Expected: only pure presentation derivation and its tests; no API or storage changes.
 
 ---
@@ -172,12 +172,12 @@ Use `Button`/`Menu` from `@expo/ui/swift-ui` with glass or borderless native sty
 
 - [ ] **Step 4: Typecheck platform resolution**
 
-Run: `cd packages/mobile && npm run typecheck`  
+Run: `cd packages/mobile && npm run typecheck`
 Expected: PASS with no iOS-only view-config imports reachable from the base implementation.
 
 - [ ] **Step 5: Review the focused diff**
 
-Run: `git diff -- packages/mobile/lib/orchestrator-row-actions.types.ts packages/mobile/lib/orchestrator-row-actions.tsx packages/mobile/lib/orchestrator-row-actions.ios.tsx`  
+Run: `git diff -- packages/mobile/lib/orchestrator-row-actions.types.ts packages/mobile/lib/orchestrator-row-actions.tsx packages/mobile/lib/orchestrator-row-actions.ios.tsx`
 Expected: only the bounded native action abstraction; no list or route logic.
 
 ---
@@ -218,7 +218,7 @@ Assert `Open orchestrator for agent-orchestrator, Needs input`, `Start orchestra
 
 - [ ] **Step 2: Run the focused tests and confirm RED**
 
-Run: `cd packages/mobile && npm test -- lib/orchestratorView.test.ts`  
+Run: `cd packages/mobile && npm test -- lib/orchestratorView.test.ts`
 Expected: FAIL because the accessibility-label helper does not exist.
 
 - [ ] **Step 3: Implement the row and helper**
@@ -236,7 +236,7 @@ Expected: PASS.
 
 - [ ] **Step 6: Review the focused diff**
 
-Run: `git diff -- packages/mobile/lib/orchestrator-project-row.tsx packages/mobile/lib/orchestratorView.ts packages/mobile/lib/orchestratorView.test.ts`  
+Run: `git diff -- packages/mobile/lib/orchestrator-project-row.tsx packages/mobile/lib/orchestratorView.ts packages/mobile/lib/orchestratorView.test.ts`
 Expected: row rendering stays outside the route and all copy/routing labels remain pure and tested.
 
 ---
