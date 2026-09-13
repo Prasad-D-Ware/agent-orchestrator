@@ -193,4 +193,9 @@ describe("Android native compatibility boundaries", () => {
 		expect(actions).toContain("backgroundColor: t.bgElevated");
 		expect(actions).not.toMatch(/<ScrollView[\s\S]*<View style=\{styles\.header\}>/);
 	});
+
+	it("keeps Android conversation-menu drags with the list instead of dismissing its sheet", () => {
+		const actions = source("./chat/ConversationActionsSheet.tsx");
+		expect(actions).toMatch(/<FlatList[\s\S]*nestedScrollEnabled/);
+	});
 });

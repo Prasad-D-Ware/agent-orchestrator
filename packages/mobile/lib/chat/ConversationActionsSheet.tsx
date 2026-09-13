@@ -41,6 +41,7 @@ export function ConversationActionsSheet({ entry, onAction }: { entry: Conversat
 		contentContainerStyle={styles.content}
 		data={sections}
 		keyExtractor={(section) => section.title}
+		nestedScrollEnabled
 		keyboardShouldPersistTaps="handled"
 		ListHeaderComponent={<SheetHeader title={entry.snapshot.title || "Untitled conversation"} subtitle={`Session · ${entry.sessionTitle}`} />}
 		renderItem={({ item: section }) => <View style={styles.section}>
