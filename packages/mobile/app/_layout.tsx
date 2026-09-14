@@ -105,9 +105,7 @@ function Shell() {
 				<Stack.Screen
 					name="settings"
 					options={{
-						// Android pushes Settings as a screen with a real Back; a sheet
-						// is an iOS convention, so the sheet stays there.
-						presentation: Platform.OS === "ios" ? "formSheet" : "card",
+						presentation: "formSheet",
 						headerShown: false,
 						sheetAllowedDetents: Platform.OS === "ios" ? [0.92] : [0.9, 1],
 						sheetInitialDetentIndex: 0,

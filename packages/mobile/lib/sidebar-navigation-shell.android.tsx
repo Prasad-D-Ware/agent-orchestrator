@@ -189,14 +189,12 @@ export function SidebarNavigationShell({ children }: { children: ReactNode }) {
 		router.push("/spawn");
 	}, [closeSidebar, router]);
 
-	// Settings is a pushed screen on Android, not a sheet laid over the drawer, so
-	// the drawer closes with it — otherwise it is stranded open behind a full
-	// screen and Back returns to a drawer the user never asked to reopen.
+	// Settings belongs to the root modal stack. Deliberately leave the native
+	// drawer open so dismissing the sheet reveals the exact drawer state beneath.
 	const openSettings = useCallback(() => {
 		haptics.tap();
-		closeSidebar();
 		router.push("/settings");
-	}, [closeSidebar, router]);
+	}, [router]);
 
 	const context = useMemo(() => ({ openSidebar, scrollRequest }), [openSidebar, scrollRequest]);
 	const contentTransform = {

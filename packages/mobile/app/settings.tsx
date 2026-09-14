@@ -62,12 +62,7 @@ export default function SettingsScreen() {
 			<View style={styles.header}>
 				<Text style={styles.headerTitle}>Settings</Text>
 				<View style={styles.closeButton}>
-					{/* A sheet is closed; a pushed screen is backed out of. */}
-					<NativeHeaderButton
-						icon={Platform.OS === "ios" ? "close" : "back"}
-						label={Platform.OS === "ios" ? "Close settings" : "Back"}
-						onPress={() => router.back()}
-					/>
+					<NativeHeaderButton icon="close" label="Close settings" onPress={() => router.back()} />
 				</View>
 			</View>
 			<ScrollView
