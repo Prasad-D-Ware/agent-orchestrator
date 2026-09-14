@@ -86,11 +86,12 @@ export function workerActionSymbol(id: WorkerActionId): SFSymbol {
 /**
  * Which actions Android and the web fallback can show an icon for.
  *
- * Those menus take a bundled drawable via `require`, and assets/icons holds
- * exactly three: pin, unpin, rename. A missing file fails at bundle time rather
- * than degrading, so an action not listed here renders with no icon instead.
+ * Those menus take a bundled drawable via `require`, and a missing file fails at
+ * bundle time rather than degrading — so this list has to track assets/icons
+ * exactly. Every action now has one, which matches iOS, where the menu resolves
+ * an SF Symbol by name for each.
  */
-export const WORKER_ACTION_DRAWABLES: readonly WorkerActionId[] = ["pin", "unpin", "rename"];
+export const WORKER_ACTION_DRAWABLES: readonly WorkerActionId[] = ["pin", "unpin", "rename", "open", "resume", "restore", "openPr", "delete"];
 
 export function hasWorkerActionDrawable(id: WorkerActionId): boolean {
 	return WORKER_ACTION_DRAWABLES.includes(id);

@@ -5,13 +5,18 @@ import type { GestureType } from "react-native-gesture-handler";
 import { useTheme, useThemeState } from "./ThemeProvider";
 import { hasWorkerActionDrawable, type WorkerAction, type WorkerActionId } from "./worker-action-model";
 
-// Android's drawables are bundled, not resolved by name, and assets/icons holds
-// only pin, unpin and rename. `require` of a missing file fails at bundle time
-// rather than rendering blank, so an action without one goes iconless.
+// Android's drawables are bundled, not resolved by name, so every action needs a
+// file here. `require` of a missing one fails at bundle time rather than
+// rendering blank, so this map and assets/icons must agree exactly.
 const DRAWABLES: Partial<Record<WorkerActionId, number>> = {
 	pin: require("../assets/icons/pin.xml"),
 	unpin: require("../assets/icons/unpin.xml"),
 	rename: require("../assets/icons/rename.xml"),
+	open: require("../assets/icons/open.xml"),
+	resume: require("../assets/icons/resume.xml"),
+	restore: require("../assets/icons/restore.xml"),
+	openPr: require("../assets/icons/openPr.xml"),
+	delete: require("../assets/icons/delete.xml"),
 };
 
 // MenuView owns Android's long-press natively. It must remain the trigger while

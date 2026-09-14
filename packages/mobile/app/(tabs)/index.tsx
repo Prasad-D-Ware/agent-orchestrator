@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Keyboard, Platform, Pressable, RefreshControl, SectionList, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Keyboard, Platform, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useKeyboardState } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { DashboardSession } from "../../lib/api";
@@ -41,6 +41,20 @@ type ListSection =
 	| { zone: "archive"; label: string; color: string; data: DashboardSession[] }
 	| { zone: "search"; label: string; color: string; data: DashboardSession[] };
 
+/**
+ * The board is one flat list, not a SectionList, and that is load-bearing.
+ *
+ * A row moving between sections has to stay mounted for its layout animation to
+ * run. In a SectionList it changes parent, which unmounts and remounts it — so a
+ * pinned row vanished from one section and reappeared in the other instead of
+ * travelling there. Flattened, the same move is a reorder within one array,
+ * which is exactly what LinearTransition animates.
+ */
+type BoardRow =
+	| { kind: "header"; key: string; label: string }
+	| { kind: "archive"; key: string }
+	| { kind: "session"; key: string; session: DashboardSession };
+
 export default function FleetScreen() {
 	const t = useTheme();
 	const styles = useThemedStyles(makeStyles);
@@ -69,7 +83,7 @@ export default function FleetScreen() {
 	// long-running project it is most of the sessions.
 	const [archiveOpen, setArchiveOpen] = useState(false);
 
-	const listRef = useTabScrollToTop<SectionList<DashboardSession, ListSection>>();
+	const listRef = useTabScrollToTop<FlatList<BoardRow>>();
 
 	const projectNames = useMemo(
 		() => new Map(projects.map((project) => [project.id, project.name])),
@@ -120,6 +134,19 @@ export default function FleetScreen() {
 			{ zone: "archive" as const, label: "Archive", color: t.textFaint, data: archiveOpen ? archived : [] },
 		];
 	}, [query, filteredGroups, pinned, sections, archived, archiveOpen, t]);
+
+	// Headers and rows as one array of siblings, so a row changing section is a
+	// reorder rather than an unmount. See BoardRow.
+	const listData = useMemo<BoardRow[]>(
+		() =>
+			listSections.flatMap((section) => [
+				section.zone === "archive"
+					? ({ kind: "archive", key: "header:archive" } as const)
+					: ({ kind: "header", key: `header:${section.zone}`, label: section.label } as const),
+				...section.data.map((session) => ({ kind: "session", key: `${session.projectId}:${session.id}`, session }) as const),
+			]),
+		[listSections],
+	);
 
 	// Turn the poll's raw failure ("401 - missing or invalid connection password")
 	// into the same human copy the pairing screens use, keyed on the cause.
@@ -247,41 +274,52 @@ export default function FleetScreen() {
 				   cascade one animation per row. Only rows that arrive after the list is
 				   already on screen animate in — which is the only case worth seeing. */
 				<LayoutAnimationConfig skipEntering>
-				<SectionList
+				<FlatList
 					ref={listRef}
-					sections={listSections}
-					keyExtractor={(item) => `${item.projectId}:${item.id}`}
+					data={listData}
+					keyExtractor={(item) => item.key}
 					contentContainerStyle={{ paddingBottom: workerListBottomInset(keyboardLayout.dockBottom) }}
-					stickySectionHeadersEnabled={false}
 					keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
 					keyboardShouldPersistTaps="handled"
 					refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.blue} />}
-					renderSectionHeader={({ section }) =>
-						section.zone === "archive" ? (
-							<ArchiveHeader count={archived.length} open={archiveOpen} onToggle={() => setArchiveOpen((v) => !v)} />
-						) : (
-							<ListSectionHeader label={section.label} />
-						)
-					}
-						renderItem={({ item }) => (
+					renderItem={({ item }) => {
+						// Headers animate too, so a section appearing or emptying reflows
+						// with the rows rather than snapping around them.
+						if (item.kind === "archive") {
+							return (
+								<BoardRowTransition>
+									<ArchiveHeader count={archived.length} open={archiveOpen} onToggle={() => setArchiveOpen((v) => !v)} />
+								</BoardRowTransition>
+							);
+						}
+						if (item.kind === "header") {
+							return (
+								<BoardRowTransition>
+									<ListSectionHeader label={item.label} />
+								</BoardRowTransition>
+							);
+						}
+						const session = item.session;
+						return (
 							<BoardRowTransition>
-							<WorkerListRow
-								session={item}
-								projectName={projectNames.get(item.projectId)}
-								isRenaming={renamingWorkerId === item.id}
-								activeSwipeId={activeSwipeId}
-								onSwipeOpen={openExclusiveSwipe}
-								onSwipeClose={closeExclusiveSwipe}
-								onRenameStart={() => setRenamingWorkerId(item.id)}
-								onRenameCancel={() => setRenamingWorkerId(undefined)}
-								onRename={(title) => renameWorker(item.id, title)}
-								onSetPinned={(pinned) => updateWorkerPin(item, pinned)}
-								onDelete={() => confirmDeleteSession(item)}
-								onResume={() => runWorkerRecovery(item, "resume")}
-								onRestore={() => runWorkerRecovery(item, "restore")}
-							/>
+								<WorkerListRow
+									session={session}
+									projectName={projectNames.get(session.projectId)}
+									isRenaming={renamingWorkerId === session.id}
+									activeSwipeId={activeSwipeId}
+									onSwipeOpen={openExclusiveSwipe}
+									onSwipeClose={closeExclusiveSwipe}
+									onRenameStart={() => setRenamingWorkerId(session.id)}
+									onRenameCancel={() => setRenamingWorkerId(undefined)}
+									onRename={(title) => renameWorker(session.id, title)}
+									onSetPinned={(pinned) => updateWorkerPin(session, pinned)}
+									onDelete={() => confirmDeleteSession(session)}
+									onResume={() => runWorkerRecovery(session, "resume")}
+									onRestore={() => runWorkerRecovery(session, "restore")}
+								/>
 							</BoardRowTransition>
-					)}
+						);
+					}}
 					ListEmptyComponent={
 						query.trim() ? (
 							<EmptyState icon="search" title="No workers found" message={`No workers match “${query.trim()}”.`} />
