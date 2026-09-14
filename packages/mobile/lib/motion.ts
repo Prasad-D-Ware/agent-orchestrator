@@ -35,6 +35,16 @@ export const BANNER_MS = 180;
 export const CROSSFADE_MS = 140;
 /** A status colour changing on a rail or dot. */
 export const TINT_MS = 200;
+/**
+ * A board row moving between sections — pinned, or promoted by a delivery event.
+ *
+ * Longer than LAYOUT_MS because this one is meant to be *followed*: the point is
+ * to see which row moved and where it went. Too fast and it is the teleport it
+ * replaces.
+ */
+export const ROW_MOVE_MS = 260;
+/** A row arriving in or leaving a section. Shorter, so it never outlasts the move. */
+export const ROW_ENTER_MS = 180;
 
 export type MotionDurations = {
 	breathe: number;
