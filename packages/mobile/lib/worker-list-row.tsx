@@ -5,7 +5,7 @@ import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-na
 import type { DashboardSession } from "./api";
 import { AgentLogo } from "./AgentLogo";
 import { haptics } from "./haptics";
-import { prLine, workerRowPresentation } from "./agentsView";
+import { prLine, workerRowPresentation, workerStatusGlyph } from "./agentsView";
 import { toneColor } from "./prView";
 import { statusVisual, type Theme } from "./theme";
 import { useTheme, useThemedStyles } from "./ThemeProvider";
@@ -56,6 +56,7 @@ export function WorkerListRow({
 	const [renameError, setRenameError] = useState<string>();
 	const row = workerRowPresentation(t, session, projectName);
 	const visual = statusVisual(t, session.status);
+	const glyph = workerStatusGlyph(session.status);
 	const prs = prLine(session);
 	const details = [row.branch, prs?.text].filter(Boolean).join("  ·  ");
 	useEffect(() => {
@@ -171,6 +172,7 @@ export function WorkerListRow({
 				<WorkerRowContents
 					row={row}
 					visual={visual}
+					glyph={glyph}
 					details={details}
 					prsTone={prs?.tone}
 					harness={session.harness}
@@ -188,6 +190,7 @@ export function WorkerListRow({
 				<WorkerRowContents
 					row={row}
 					visual={visual}
+					glyph={glyph}
 					details={details}
 					prsTone={prs?.tone}
 					harness={session.harness}
@@ -202,6 +205,7 @@ export function WorkerListRow({
 function WorkerRowContents({
 	row,
 	visual,
+	glyph,
 	details,
 	prsTone,
 	harness,
@@ -217,6 +221,7 @@ function WorkerRowContents({
 }: {
 	row: ReturnType<typeof workerRowPresentation>;
 	visual: ReturnType<typeof statusVisual>;
+	glyph: ReturnType<typeof workerStatusGlyph>;
 	details: string;
 	prsTone?: Parameters<typeof toneColor>[1];
 	harness: DashboardSession["harness"];
@@ -238,6 +243,12 @@ function WorkerRowContents({
 				<Text style={styles.project} numberOfLines={1}>
 					{row.project}
 				</Text>
+				{/* Paired with the tinted label so status reads by shape as well as
+				    colour. Only shown alongside a real status — when the row is
+				    showing an elapsed time instead, there is no state to depict. */}
+				{glyph && row.trailingKind === "status" ? (
+					<Feather name={glyph} size={12} color={visual.color} />
+				) : null}
 				<Text
 					style={[styles.trailing, { color: row.trailingKind === "status" ? visual.color : t.textTertiary }]}
 					numberOfLines={1}

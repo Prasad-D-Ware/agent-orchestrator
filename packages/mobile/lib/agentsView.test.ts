@@ -5,6 +5,7 @@ import {
 	boardZoneOf,
 	groupSessions,
 	kanbanColumnOf,
+	workerStatusGlyph,
 	isArchived,
 	prLine,
 	showBranch,
@@ -69,6 +70,34 @@ describe("boardZoneOf", () => {
 	// column never has to render as a section.
 	it("never yields an archive section", () => {
 		expect(boardZoneOf(session({ status: "working", kanbanColumn: "archive" }))).toBe("building");
+	});
+});
+
+describe("workerStatusGlyph", () => {
+	// The row tints its status label by colour alone, which a colour-blind reader
+	// cannot use. The glyph is a second channel for the same fact.
+	it("gives distinct shapes to the states a person acts on", () => {
+		expect(workerStatusGlyph("needs_input")).toBe("message-square");
+		expect(workerStatusGlyph("ci_failed")).toBe("x-octagon");
+		expect(workerStatusGlyph("stuck")).toBe("alert-circle");
+		expect(workerStatusGlyph("mergeable")).toBe("check-circle");
+	});
+
+	it("separates blocked-on-you from broken", () => {
+		expect(workerStatusGlyph("needs_input")).not.toBe(workerStatusGlyph("errored"));
+	});
+
+	it("marks quiet and busy states differently", () => {
+		expect(workerStatusGlyph("working")).toBe("loader");
+		expect(workerStatusGlyph("idle")).toBe("moon");
+	});
+
+	// A generic glyph on an unknown status is noise pretending to be signal.
+	it("returns nothing when the status says nothing specific", () => {
+		expect(workerStatusGlyph(null)).toBeNull();
+		expect(workerStatusGlyph(undefined)).toBeNull();
+		expect(workerStatusGlyph("unknown")).toBeNull();
+		expect(workerStatusGlyph("no_signal")).toBeNull();
 	});
 });
 

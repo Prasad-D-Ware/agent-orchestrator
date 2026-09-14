@@ -90,6 +90,51 @@ export function boardZoneOf(session: DashboardSession): BoardZone {
  * Section labels, taken from desktop's own strings so the two apps name the
  * same thing identically (product-ui session-presentation.ts, `column.*`).
  */
+/**
+ * A shape for each status, so state does not rest on colour alone.
+ *
+ * The row already tints its trailing label by status, which is invisible to a
+ * colour-blind reader and weak in bright sun. A glyph adds a second channel
+ * carrying the same fact.
+ *
+ * Feather names rather than an icon component, so this stays a pure mapping the
+ * row can render however it likes — and so it is testable without React Native.
+ */
+export type WorkerStatusGlyph = "alert-circle" | "message-square" | "x-octagon" | "check-circle" | "git-pull-request" | "loader" | "moon";
+
+export function workerStatusGlyph(status?: string | null): WorkerStatusGlyph | null {
+	switch (status) {
+		case "needs_input":
+			return "message-square";
+		case "changes_requested":
+			return "message-square";
+		case "stuck":
+		case "errored":
+		case "exited":
+			return "alert-circle";
+		case "ci_failed":
+			return "x-octagon";
+		case "mergeable":
+		case "approved":
+			return "check-circle";
+		case "merged":
+		case "pr_open":
+		case "draft":
+		case "review_pending":
+			return "git-pull-request";
+		case "working":
+		case "detecting":
+		case "spawning":
+			return "loader";
+		case "idle":
+			return "moon";
+		default:
+			// No glyph beats a meaningless one: an unknown status has nothing
+			// specific to say, and a generic dot would only add noise.
+			return null;
+	}
+}
+
 export function zoneMeta(t: Theme, zone: BoardZone): { label: string; color: string } {
 	switch (zone) {
 		case "needs_you":
