@@ -8,6 +8,7 @@ import { ActivityIndicator, Image, Keyboard, Pressable, ScrollView, StyleSheet, 
 import { haptics } from "../haptics";
 import type { Theme } from "../theme";
 import { useTheme, useThemedStyles } from "../ThemeProvider";
+import { fontScaleCap } from "../tokens";
 import { MicKey } from "../voice/MicKey";
 import { useVoiceInput } from "../voice/useVoiceInput";
 import { activeTurn, type ChatConfigOption, type ChatImage, type ChatModel, type ChatResource, type ChatSkill, type ConversationSnapshot, type TurnSettings } from "./types";
@@ -21,6 +22,7 @@ import { chatSheetRoute } from "./chatSheetRegistry";
 import { ChatAttachmentMenu } from "./ChatAttachmentMenu";
 import { ChatTurnSettingsControl } from "./ChatTurnSettingsControl";
 import { composerDeliveryPresentation, composerDeliveryRoute, composerPrimaryAction, type ComposerDeliveryIntent } from "./composerDeliveryModel";
+import { contextMeterModel } from "./contextMeter";
 import { createRequestGate } from "./requestGate";
 import { queuedConversationMessages } from "./timelineModel";
 
@@ -58,6 +60,7 @@ export function ChatComposer({
 	onSettings,
 	onConfigOption,
 	bottomInset,
+	quotaActive,
 }: {
 	sessionId: string;
 	snapshot: ConversationSnapshot;
@@ -82,6 +85,8 @@ export function ChatComposer({
 	onSettings(settings: TurnSettings): Promise<void>;
 	onConfigOption(id: string, value: { value: string } | { enabled: boolean }): Promise<ChatConfigOption[]>;
 	bottomInset: number;
+	/** The account-quota banner is up, so the context meter stands down. */
+	quotaActive?: boolean;
 }) {
 	const t = useTheme();
 	const router = useRouter();
@@ -97,6 +102,8 @@ export function ChatComposer({
 	const active = Boolean(activeTurn(snapshot));
 	const queuedMessages = useMemo(() => queuedConversationMessages(snapshot), [snapshot]);
 	const visibleQueuedMessages = useMemo(() => queuedMessages.filter((entry) => !hiddenQueuedTurnIds.has(entry.turnId)), [hiddenQueuedTurnIds, queuedMessages]);
+	// Absent below 70%: a permanent token gauge is chrome nobody reads.
+	const contextMeter = contextMeterModel(snapshot.usage, Boolean(quotaActive));
 	const canSteer = snapshot.capabilities?.includes("steer") && !steerUnavailable && active;
 	const canEmbedFiles = snapshot.capabilities?.includes("embedded_context");
 	const hasDraft = Boolean(text.trim());
@@ -240,6 +247,12 @@ export function ChatComposer({
 					<Text numberOfLines={1} style={styles.deliveryNoteText}>{attachments.length ? "Attachments next" : "Sent after this"}</Text>
 					{deliveryPresentation.showSteerAction ? <Pressable accessibilityRole="button" accessibilityLabel="Steer this turn now" disabled={disabled || submitting || pending} onPress={() => { haptics.tap(); void submit("steer"); }} style={({ pressed }) => [styles.steerAction, pressed && { opacity: 0.7 }]}><Feather name="corner-up-right" size={14} color={t.blue} /></Pressable> : null}
 				</View> : null}
+				{contextMeter ? <View accessibilityRole="progressbar" accessibilityLabel={`Context window ${contextMeter.percent}% used`} style={styles.contextMeter}>
+					<View style={styles.contextTrack}>
+						<View style={[styles.contextFill, { width: `${contextMeter.fillPercent}%`, backgroundColor: contextMeter.severity === "critical" ? t.red : t.amber }]} />
+					</View>
+					<Text numberOfLines={1} maxFontSizeMultiplier={fontScaleCap.chrome} style={[styles.contextText, { color: contextMeter.severity === "critical" ? t.red : t.amber }]}>{contextMeter.label}</Text>
+				</View> : null}
 			</View>
 			{visibleQueuedMessages.length ? <View accessibilityRole="list" style={styles.queueDock}>
 				{visibleQueuedMessages.map((entry, index) => {
@@ -327,6 +340,11 @@ const makeStyles = (t: Theme) => StyleSheet.create({
 	attachment: { maxWidth: 180, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: t.bgElevated, borderRadius: 9, borderWidth: 1, borderColor: t.borderSubtle, paddingHorizontal: 9, paddingVertical: 7 },
 	attachmentImage: { width: 28, height: 28, borderRadius: 6, backgroundColor: t.bgSubtle },
 	attachmentName: { flexShrink: 1, color: t.textSecondary, fontSize: 11 },
+	// Sits at the end of the meta row; the bar carries the reading, the label names it.
+	contextMeter: { flexDirection: "row", alignItems: "center", gap: 6, height: 32, paddingLeft: 8 },
+	contextTrack: { width: 34, height: 4, borderRadius: 2, overflow: "hidden", backgroundColor: t.bgSubtle },
+	contextFill: { height: 4, borderRadius: 2 },
+	contextText: { fontSize: 10, fontWeight: "700" },
 	deliveryNote: { maxWidth: "46%", height: 32, flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 5, paddingRight: 5 },
 	deliveryNoteText: { flexShrink: 1, color: t.textTertiary, fontSize: 10, fontWeight: "600" },
 	steerAction: { width: 30, height: 30, alignItems: "center", justifyContent: "center", borderRadius: 15, backgroundColor: t.tintBlue },
