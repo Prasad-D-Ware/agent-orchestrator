@@ -30,6 +30,8 @@ import { dockInset, keyboardVerticalOffset, screenKeyboardAvoidance } from "../s
 import type { Theme } from "../theme";
 import { useTheme, useThemedStyles } from "../ThemeProvider";
 import { getWorkspacePaths, openSessionShell } from "./api";
+import { approvalDockModel } from "./approvalDockModel";
+import { ApprovalDock } from "./ApprovalDock";
 import { ChatComposer } from "./ChatComposer";
 import { ChatTimeline } from "./ChatTimeline";
 import { ConversationTitle } from "./ConversationTitle";
@@ -317,6 +319,11 @@ export function ChatSessionScreen({ session }: { session: MobileChatSession }) {
 	const brokenServers = brokenMcpServers(snapshot);
 	const rolledBack = snapshot.turns.filter((turn) => turn.rolledBack).length;
 	const quota = quotaWarning(snapshot.rateLimits);
+	// The blocking request, kept above the composer so it survives scrolling away.
+	const dock = approvalDockModel(snapshot, {
+		approval: conversation.pendingActions.includes("approval"),
+		input: conversation.pendingActions.includes("input"),
+	});
 	const compactSupported = can(snapshot, "compaction") && !conversationActionUnsupported("compact", conversation.actionCodes.compact);
 	const mcpReloadSupported = can(snapshot, "mcp_reload") && !conversationActionUnsupported("mcp", conversation.actionCodes.mcp);
 	const steerUnsupported = conversationActionUnsupported("steer", conversation.actionCodes.steer);
@@ -385,6 +392,7 @@ export function ChatSessionScreen({ session }: { session: MobileChatSession }) {
 				jumpToSequence={jumpToSequence}
 				onJumpHandled={clearJumpToSequence}
 			/>
+			{dock ? <ApprovalDock model={dock} onDecide={conversation.resolveApproval} onShow={setJumpToSequence} /> : null}
 			<ChatComposer
 				sessionId={session.id}
 				snapshot={snapshot}
