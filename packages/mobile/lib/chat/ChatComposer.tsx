@@ -63,9 +63,12 @@ export function ChatComposer({
 	bottomInset,
 	quotaActive,
 	request,
+	requestDismissed,
 	onRequestDecide,
 	onRequestResolveInput,
 	onShowRequest,
+	onDismissRequest,
+	onRestoreRequest,
 }: {
 	sessionId: string;
 	snapshot: ConversationSnapshot;
@@ -93,9 +96,13 @@ export function ChatComposer({
 	quotaActive?: boolean;
 	/** A pending request, which takes the composer's place until it is answered. */
 	request?: RequestDockModel | null;
+	/** The user pushed the request aside to type instead. */
+	requestDismissed?: boolean;
 	onRequestDecide(requestId: string, decisionId: string): Promise<void>;
 	onRequestResolveInput(requestId: string, action: "accept" | "decline" | "cancel", content?: Record<string, unknown>): Promise<void>;
 	onShowRequest(sequence: number): void;
+	onDismissRequest(): void;
+	onRestoreRequest(): void;
 }) {
 	const t = useTheme();
 	const router = useRouter();
@@ -108,9 +115,6 @@ export function ChatComposer({
 	const [promotingQueuedTurnId, setPromotingQueuedTurnId] = useState<string>();
 	const [cancellingQueuedTurnId, setCancellingQueuedTurnId] = useState<string>();
 	const [hiddenQueuedTurnIds, setHiddenQueuedTurnIds] = useState<Set<string>>(() => new Set());
-	// Which request the user pushed aside to type instead. Keyed by sequence so a
-	// new request always presents itself.
-	const [dismissedRequest, setDismissedRequest] = useState<number>();
 	const active = Boolean(activeTurn(snapshot));
 	const queuedMessages = useMemo(() => queuedConversationMessages(snapshot), [snapshot]);
 	const visibleQueuedMessages = useMemo(() => queuedMessages.filter((entry) => !hiddenQueuedTurnIds.has(entry.turnId)), [hiddenQueuedTurnIds, queuedMessages]);
@@ -118,13 +122,13 @@ export function ChatComposer({
 	const contextMeter = contextMeterModel(snapshot.usage, Boolean(quotaActive));
 	// A blocking question is the next thing to do, so it takes the input's place
 	// rather than pointing at a card somewhere up the timeline.
-	const requestCard = request && dismissedRequest !== request.sequence ? (
+	const requestCard = request && !requestDismissed ? (
 		<RequestCard
 			model={request}
 			onDecide={onRequestDecide}
 			onResolveInput={onRequestResolveInput}
 			onShow={onShowRequest}
-			onDismiss={() => setDismissedRequest(request.sequence)}
+			onDismiss={onDismissRequest}
 		/>
 	) : null;
 	const canSteer = snapshot.capabilities?.includes("steer") && !steerUnavailable && active;
@@ -333,7 +337,7 @@ export function ChatComposer({
 			{request && !requestCard ? <Pressable
 				accessibilityRole="button"
 				accessibilityLabel={`${request.title}. Answer it`}
-				onPress={() => { haptics.tap(); setDismissedRequest(undefined); }}
+				onPress={() => { haptics.tap(); onRestoreRequest(); }}
 				style={({ pressed }) => [styles.restore, pressed && { opacity: 0.6 }]}
 			>
 				<Feather name={request.kind === "approval" ? "shield" : "message-circle"} size={12} color={t.amber} />
