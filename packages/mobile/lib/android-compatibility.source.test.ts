@@ -170,16 +170,13 @@ describe("Android native compatibility boundaries", () => {
 		expect(source("./push.ts")).not.toContain('sound: "default"');
 	});
 
-	it("pushes Settings as a screen on Android, keeping the iOS sheet", () => {
+	it("presents Settings from the root stack above the preserved drawer", () => {
 		const rootSettingsPath = fileURLToPath(new URL("../app/settings.tsx", import.meta.url));
 		const nestedSettingsPath = fileURLToPath(new URL("../app/(tabs)/settings.tsx", import.meta.url));
 		expect(existsSync(rootSettingsPath)).toBe(true);
 		expect(existsSync(nestedSettingsPath)).toBe(false);
 		const rootLayout = source("../app/_layout.tsx");
-		expect(rootLayout).toMatch(/name="settings"[\s\S]*presentation: Platform\.OS === "ios" \? "formSheet" : "card"/);
-		// A pushed screen is backed out of, so the drawer must not be left open
-		// beneath it.
-		expect(source("./sidebar-navigation-shell.android.tsx")).toMatch(/openSettings = useCallback\(\(\) => \{[\s\S]*?closeSidebar\(\);/);
+		expect(rootLayout).toMatch(/name="settings"[\s\S]*presentation:\s*"formSheet"/);
 	});
 
 	it("renders conversation actions in a single native list with its conversation header", () => {
