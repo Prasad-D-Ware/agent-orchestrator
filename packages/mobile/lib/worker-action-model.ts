@@ -93,6 +93,37 @@ export function workerActionSymbol(id: WorkerActionId): SFSymbol {
  */
 export const WORKER_ACTION_DRAWABLES: readonly WorkerActionId[] = ["pin", "unpin", "rename", "open", "resume", "restore", "openPr", "delete"];
 
+/**
+ * Feather glyph for each action, for Android's own action sheet.
+ *
+ * Android does not render the native MenuView — its rows are an in-app Modal —
+ * so it cannot use the bundled drawables above. A vector font needs no asset
+ * pipeline at all, and gives that list the same iconography iOS gets from SF
+ * Symbols. Kept as a string union so this module stays free of React Native.
+ */
+export type WorkerActionGlyph =
+	| "message-square"
+	| "map-pin"
+	| "slash"
+	| "edit-2"
+	| "play"
+	| "rotate-ccw"
+	| "git-pull-request"
+	| "trash-2";
+
+export function workerActionGlyph(id: WorkerActionId): WorkerActionGlyph {
+	switch (id) {
+		case "open": return "message-square";
+		case "pin": return "map-pin";
+		case "unpin": return "slash";
+		case "rename": return "edit-2";
+		case "resume": return "play";
+		case "restore": return "rotate-ccw";
+		case "openPr": return "git-pull-request";
+		case "delete": return "trash-2";
+	}
+}
+
 export function hasWorkerActionDrawable(id: WorkerActionId): boolean {
 	return WORKER_ACTION_DRAWABLES.includes(id);
 }

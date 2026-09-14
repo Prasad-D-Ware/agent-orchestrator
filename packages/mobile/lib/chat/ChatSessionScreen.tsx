@@ -165,14 +165,15 @@ export function ChatSessionScreen({ session }: { session: MobileChatSession }) {
 	// The timeline collapses a request the card is answering to a record of what
 	// was asked — one live set of controls, never two.
 	const answeredBelow = request && !requestDismissed && request.canAnswerInline ? request.sequence : undefined;
-	// The card pages by swipe, and on iOS a left-to-right swipe is also the
-	// screen's back gesture — which won, popping to the board instead of stepping
-	// back a question. Hand that axis to the card, but only while it actually has
-	// pages to move between.
-	const cardPages = request && !requestDismissed && request.canAnswerInline ? request.pages.length : 1;
+	// On iOS a left-to-right swipe is the screen's back gesture, and it beat the
+	// card's own swipe — you got the board instead of the previous question. The
+	// whole horizontal axis goes to the card while it is up; the header's back
+	// button still leaves the session, and the card's ✕ still returns the
+	// composer, so nothing becomes unreachable.
+	const cardShowing = Boolean(request && !requestDismissed);
 	useLayoutEffect(() => {
-		navigation.setOptions({ gestureEnabled: cardPages <= 1 });
-	}, [cardPages, navigation]);
+		navigation.setOptions({ gestureEnabled: !cardShowing });
+	}, [cardShowing, navigation]);
 	useLayoutEffect(() => {
 		if (!headerRightReady) {
 			navigation.setOptions({ headerRight: undefined });

@@ -1,3 +1,4 @@
+import { Feather } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -5,7 +6,7 @@ import { haptics } from "./haptics";
 import { type Theme } from "./theme";
 import { useTheme, useThemedStyles } from "./ThemeProvider";
 import { boundWorkerActionTranslation, WORKER_ACTION_REVEAL_WIDTH, resolveWorkerActionRail } from "./worker-row-swipe-model";
-import type { WorkerActionId } from "./worker-action-model";
+import { workerActionGlyph, type WorkerActionId } from "./worker-action-model";
 import type { WorkerRowInteractionProps } from "./worker-row-interaction.types";
 
 const GESTURE_DISTANCE = 16;
@@ -179,6 +180,13 @@ export function WorkerRowInteraction({
 									android_ripple={{ color: action.destructive ? t.tintRed : t.tintBlue }}
 									style={({ pressed }) => [styles.menuRow, pressed && styles.menuButtonPressed]}
 								>
+									{/* A vector font, not a drawable: this list is an in-app Modal,
+									    so it never reaches the bundled icons the native menu uses. */}
+									<Feather
+										name={workerActionGlyph(action.id)}
+										size={19}
+										color={action.destructive ? t.red : t.textSecondary}
+									/>
 									<Text style={[styles.menuRowText, action.destructive && styles.menuRowTextDestructive]}>
 										{action.title}
 									</Text>
@@ -232,7 +240,7 @@ const makeStyles = (t: Theme) =>
 		},
 		menuTitle: { color: t.textPrimary, fontSize: 20, lineHeight: 25, fontWeight: "700" },
 		menuList: { marginTop: 6, marginHorizontal: -8 },
-		menuRow: { minHeight: 48, paddingHorizontal: 8, justifyContent: "center", borderRadius: 10 },
+		menuRow: { minHeight: 48, paddingHorizontal: 8, flexDirection: "row", alignItems: "center", gap: 14, borderRadius: 10 },
 		menuRowText: { color: t.textPrimary, fontSize: 16, lineHeight: 21, fontWeight: "500" },
 		menuRowTextDestructive: { color: t.red },
 		menuButton: { minHeight: 42, paddingHorizontal: 16, borderRadius: 21, alignItems: "center", justifyContent: "center", marginTop: 10, alignSelf: "flex-end" },
