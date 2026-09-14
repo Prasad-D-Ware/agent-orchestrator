@@ -9,6 +9,8 @@ import { classifyConnectionFailure, describeConnectionFailure } from "../../lib/
 import { tunnelMayHaveRotated } from "../../lib/staleTunnel";
 import { haptics } from "../../lib/haptics";
 import { groupSessions, type BoardSection } from "../../lib/agentsView";
+import { LayoutAnimationConfig } from "react-native-reanimated";
+import { BoardRowTransition } from "../../lib/BoardRowTransition";
 import { StaleBanner } from "../../lib/StaleBanner";
 import { useApp } from "../../lib/store";
 import { UnpairedState } from "../../lib/UnpairedState";
@@ -241,6 +243,10 @@ export default function FleetScreen() {
 					<ActivityIndicator color={t.blue} />
 				</View>
 			) : (
+				/* skipEntering so the first render and every poll-driven rebuild do not
+				   cascade one animation per row. Only rows that arrive after the list is
+				   already on screen animate in — which is the only case worth seeing. */
+				<LayoutAnimationConfig skipEntering>
 				<SectionList
 					ref={listRef}
 					sections={listSections}
@@ -258,6 +264,7 @@ export default function FleetScreen() {
 						)
 					}
 						renderItem={({ item }) => (
+							<BoardRowTransition>
 							<WorkerListRow
 								session={item}
 								projectName={projectNames.get(item.projectId)}
@@ -273,6 +280,7 @@ export default function FleetScreen() {
 								onResume={() => runWorkerRecovery(item, "resume")}
 								onRestore={() => runWorkerRecovery(item, "restore")}
 							/>
+							</BoardRowTransition>
 					)}
 					ListEmptyComponent={
 						query.trim() ? (
@@ -308,6 +316,7 @@ export default function FleetScreen() {
 						)
 					}
 				/>
+				</LayoutAnimationConfig>
 			)}
 
 			<View style={[styles.dock, { bottom: keyboardLayout.dockBottom }]}>
