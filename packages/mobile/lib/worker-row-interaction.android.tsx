@@ -1,4 +1,4 @@
-import { Feather } from "@expo/vector-icons";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -181,12 +181,10 @@ export function WorkerRowInteraction({
 									style={({ pressed }) => [styles.menuRow, pressed && styles.menuButtonPressed]}
 								>
 									{/* A vector font, not a drawable: this list is an in-app Modal,
-									    so it never reaches the bundled icons the native menu uses. */}
-									<Feather
-										name={workerActionGlyph(action.id)}
-										size={19}
-										color={action.destructive ? t.red : t.textSecondary}
-									/>
+									    so it never reaches the bundled icons the native menu uses.
+									    Pin comes from the same set as the swipe rail, tilted to
+									    match it. */}
+									<MenuGlyph id={action.id} color={action.destructive ? t.red : t.textSecondary} />
 									<Text style={[styles.menuRowText, action.destructive && styles.menuRowTextDestructive]}>
 										{action.title}
 									</Text>
@@ -206,6 +204,18 @@ export function WorkerRowInteraction({
 			</Modal>
 		</>
 	);
+}
+
+/**
+ * One action's icon. Pin and unpin come from the swipe rail's set and carry its
+ * tilt, so the same action reads the same whichever way you reach it.
+ */
+function MenuGlyph({ id, color }: { id: WorkerActionId; color: string }) {
+	const glyph = workerActionGlyph(id);
+	if (glyph.family === "material") {
+		return <MaterialCommunityIcons name={glyph.name} size={21} color={color} style={{ transform: [{ rotate: "28deg" }] }} />;
+	}
+	return <Feather name={glyph.name} size={19} color={color} />;
 }
 
 const makeStyles = (t: Theme) =>
