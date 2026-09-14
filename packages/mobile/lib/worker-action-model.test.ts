@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
 	hasWorkerActionDrawable,
+	workerActionGlyph,
 	workerActionSymbol,
 	workerContextActions,
 	type WorkerActionState,
@@ -84,6 +85,27 @@ describe("workerActionSymbol", () => {
 
 	it("distinguishes pin from unpin", () => {
 		expect(workerActionSymbol("pin")).not.toBe(workerActionSymbol("unpin"));
+	});
+});
+
+describe("workerActionGlyph", () => {
+	// Android renders its own Modal, not the native menu, so these are what that
+	// list actually shows. Every action needs one or a row renders iconless beside
+	// rows that don't.
+	it("gives every action a glyph", () => {
+		for (const id of ["pin", "unpin", "rename", "delete", "open", "openPr", "resume", "restore"] as const) {
+			expect(workerActionGlyph(id)).toBeTruthy();
+		}
+	});
+
+	it("does not draw pin and unpin the same way", () => {
+		expect(workerActionGlyph("pin")).not.toBe(workerActionGlyph("unpin"));
+	});
+
+	// Destructive and recovery actions are the ones you must not confuse.
+	it("keeps delete, resume and restore distinct", () => {
+		const glyphs = [workerActionGlyph("delete"), workerActionGlyph("resume"), workerActionGlyph("restore")];
+		expect(new Set(glyphs).size).toBe(3);
 	});
 });
 
