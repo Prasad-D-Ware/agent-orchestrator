@@ -92,6 +92,10 @@ export function ChatSessionScreen({ session }: { session: MobileChatSession }) {
 	const [menuOpen, setMenuOpen] = useState(false);
 	const [jumpToSequence, setJumpToSequence] = useState<number>();
 	const clearJumpToSequence = useCallback(() => setJumpToSequence(undefined), []);
+	// Which request the user pushed aside to type instead. It lives here because
+	// both the composer and the timeline change shape depending on it.
+	const [dismissedRequest, setDismissedRequest] = useState<number>();
+	const restoreRequest = useCallback(() => setDismissedRequest(undefined), []);
 	const [filePaths, setFilePaths] = useState<string[]>([]);
 	const [filePathsTruncated, setFilePathsTruncated] = useState(false);
 	const filePathsRequest = useRef<Promise<{ paths: string[]; truncated: boolean }> | null>(null);
@@ -359,6 +363,10 @@ export function ChatSessionScreen({ session }: { session: MobileChatSession }) {
 		approval: conversation.pendingActions.includes("approval"),
 		input: conversation.pendingActions.includes("input"),
 	});
+	const requestDismissed = request ? dismissedRequest === request.sequence : false;
+	// The timeline collapses a request the card is answering to a record of what
+	// was asked — one live set of controls, never two.
+	const answeredBelow = request && !requestDismissed && request.canAnswerInline ? request.sequence : undefined;
 	const compactSupported = can(snapshot, "compaction") && !conversationActionUnsupported("compact", conversation.actionCodes.compact);
 	const mcpReloadSupported = can(snapshot, "mcp_reload") && !conversationActionUnsupported("mcp", conversation.actionCodes.mcp);
 	const steerUnsupported = conversationActionUnsupported("steer", conversation.actionCodes.steer);
@@ -428,15 +436,19 @@ export function ChatSessionScreen({ session }: { session: MobileChatSession }) {
 				onRollback={conversation.rollback}
 				jumpToSequence={jumpToSequence}
 				onJumpHandled={clearJumpToSequence}
+				answeredBelow={answeredBelow}
 			/>
 			<ChatComposer
 				sessionId={session.id}
 				snapshot={snapshot}
 				quotaActive={Boolean(quota)}
 				request={request}
+				requestDismissed={requestDismissed}
 				onRequestDecide={conversation.resolveApproval}
 				onRequestResolveInput={conversation.resolveInput}
 				onShowRequest={setJumpToSequence}
+				onDismissRequest={() => setDismissedRequest(request?.sequence)}
+				onRestoreRequest={restoreRequest}
 				skills={conversation.skills}
 				filePaths={filePaths}
 				filePathsTruncated={filePathsTruncated}
