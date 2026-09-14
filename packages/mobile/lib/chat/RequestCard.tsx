@@ -1,0 +1,250 @@
+import { Feather } from "@expo/vector-icons";
+import { useCallback, useState } from "react";
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Directions, Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
+
+import { haptics } from "../haptics";
+import { CROSSFADE_MS } from "../motion";
+import type { Theme } from "../theme";
+import { useTheme, useThemedStyles } from "../ThemeProvider";
+import { fontScaleCap } from "../tokens";
+import { useReducedMotion } from "../useReducedMotion";
+import type { RequestDockModel, RequestDockPage } from "./requestDockModel";
+
+/**
+ * The pending request, standing in for the composer.
+ *
+ * A blocking question is the next thing you have to do, so it takes the place
+ * you were going to type in rather than sitting above it as a pointer to a card
+ * somewhere up the timeline. Multiple questions page in place — chevrons, or a
+ * swipe.
+ *
+ * The inline cards stay in the timeline as the record, and anything this card
+ * cannot express honestly (a form, a URL handshake) is handed back to them.
+ */
+export function RequestCard({
+	model,
+	onDecide,
+	onResolveInput,
+	onShow,
+	onDismiss,
+}: {
+	model: RequestDockModel;
+	onDecide(requestId: string, decisionId: string): Promise<void>;
+	onResolveInput(requestId: string, action: "accept" | "decline" | "cancel", content?: Record<string, unknown>): Promise<void>;
+	onShow(sequence: number): void;
+	onDismiss(): void;
+}) {
+	const t = useTheme();
+	const styles = useThemedStyles(makeStyles);
+	const reduceMotion = useReducedMotion();
+	const [page, setPage] = useState(0);
+	const [values, setValues] = useState<Record<string, unknown>>({});
+	const [draft, setDraft] = useState("");
+	const [submitting, setSubmitting] = useState(false);
+	const [error, setError] = useState<string>();
+
+	const total = model.pages.length;
+	const current: RequestDockPage | undefined = model.pages[page];
+	const busy = model.busy || submitting;
+
+	const goTo = useCallback((next: number) => {
+		if (next < 0 || next >= total) return;
+		haptics.select();
+		setError(undefined);
+		setDraft("");
+		setPage(next);
+	}, [total]);
+
+	// A fling is enough for "swipe between questions" and never competes with the
+	// vertical scroll behind the card.
+	const swipe = Gesture.Race(
+		Gesture.Fling().direction(Directions.RIGHT).onEnd(() => goTo(page - 1)).runOnJS(true),
+		Gesture.Fling().direction(Directions.LEFT).onEnd(() => goTo(page + 1)).runOnJS(true),
+	);
+
+	if (!current) return null;
+
+	const run = (work: Promise<void>) => {
+		setSubmitting(true);
+		setError(undefined);
+		work
+			.then(() => haptics.success())
+			.catch((cause) => {
+				setError(cause instanceof Error ? cause.message : String(cause));
+				haptics.error();
+			})
+			.finally(() => setSubmitting(false));
+	};
+
+	const answer = (value: unknown, property?: string) => {
+		if (busy || !model.requestId) return;
+		if (model.kind === "approval") {
+			run(onDecide(model.requestId, String(value)));
+			return;
+		}
+		const name = property ?? current.propertyName;
+		if (!name) return;
+		const next = { ...values, [name]: value };
+		setValues(next);
+		// Last question answered — send the lot.
+		if (page >= total - 1) run(onResolveInput(model.requestId, "accept", next));
+		else goTo(page + 1);
+	};
+
+	const sendTyped = () => {
+		const typed = draft.trim();
+		if (!typed || !current.freeText) return;
+		answer(current.freeText.numeric ? Number(typed) : typed, current.freeText.name);
+	};
+
+	// Deferred requests get a name and a way back to the card that owns them.
+	if (!model.canAnswerInline) {
+		return (
+			<View style={styles.card}>
+				<View style={styles.head}>
+					<Text maxFontSizeMultiplier={fontScaleCap.chrome} style={styles.eyebrow}>{model.title}</Text>
+					<Pressable accessibilityRole="button" accessibilityLabel="Dismiss and type instead" hitSlop={10} onPress={() => { haptics.tap(); onDismiss(); }}>
+						<Feather name="x" size={17} color={t.textTertiary} />
+					</Pressable>
+				</View>
+				{current.question ? <Text maxFontSizeMultiplier={fontScaleCap.title} style={styles.question}>{current.question}</Text> : null}
+				<Pressable
+					accessibilityRole="button"
+					accessibilityLabel="Open the full request"
+					onPress={() => { haptics.tap(); onShow(model.sequence); }}
+					style={({ pressed }) => [styles.openForm, pressed && styles.pressed]}
+				>
+					<Feather name="arrow-up" size={14} color={t.blue} />
+					<Text maxFontSizeMultiplier={fontScaleCap.chrome} style={styles.openFormText}>Open the full request</Text>
+				</Pressable>
+			</View>
+		);
+	}
+
+	return (
+		<GestureDetector gesture={swipe}>
+			<View style={styles.card}>
+				<View style={styles.head}>
+					{total > 1 ? <View style={styles.pager}>
+						<Pressable accessibilityRole="button" accessibilityLabel="Previous question" disabled={page === 0} hitSlop={10} onPress={() => goTo(page - 1)}>
+							<Feather name="chevron-left" size={18} color={page === 0 ? t.textFaint : t.textSecondary} />
+						</Pressable>
+						<Text maxFontSizeMultiplier={fontScaleCap.chrome} style={styles.pagerText}>{page + 1} of {total}</Text>
+						<Pressable accessibilityRole="button" accessibilityLabel="Next question" disabled={page >= total - 1} hitSlop={10} onPress={() => goTo(page + 1)}>
+							<Feather name="chevron-right" size={18} color={page >= total - 1 ? t.textFaint : t.textSecondary} />
+						</Pressable>
+					</View> : <Text maxFontSizeMultiplier={fontScaleCap.chrome} style={styles.eyebrow}>{model.title}</Text>}
+					<Pressable accessibilityRole="button" accessibilityLabel="Dismiss and type instead" hitSlop={10} onPress={() => { haptics.tap(); onDismiss(); }}>
+						<Feather name="x" size={17} color={t.textTertiary} />
+					</Pressable>
+				</View>
+
+				<Animated.View
+					key={page}
+					entering={reduceMotion ? undefined : FadeIn.duration(CROSSFADE_MS)}
+					exiting={reduceMotion ? undefined : FadeOut.duration(CROSSFADE_MS)}
+				>
+					{current.question ? <Text maxFontSizeMultiplier={fontScaleCap.title} style={styles.question}>{current.question}</Text> : null}
+
+					{current.options.map((option, index) => (
+						<Pressable
+							key={option.id}
+							accessibilityRole="button"
+							accessibilityLabel={option.label}
+							accessibilityState={{ disabled: busy }}
+							disabled={busy}
+							onPress={() => { haptics.tap(); answer(option.id); }}
+							style={({ pressed }) => [styles.option, index > 0 && styles.optionDivider, pressed && styles.pressed, busy && styles.dim]}
+						>
+							<View style={styles.ordinal}><Text maxFontSizeMultiplier={fontScaleCap.chrome} style={styles.ordinalText}>{index + 1}</Text></View>
+							<View style={styles.optionBody}>
+								<Text maxFontSizeMultiplier={fontScaleCap.body} style={styles.optionLabel}>{option.label}</Text>
+								{option.description ? <Text maxFontSizeMultiplier={fontScaleCap.body} style={styles.optionHint}>{option.description}</Text> : null}
+							</View>
+						</Pressable>
+					))}
+
+					{current.freeText ? <View style={[styles.typed, current.options.length > 0 && styles.optionDivider]}>
+						<View style={styles.ordinal}><Feather name="edit-2" size={12} color={t.textTertiary} /></View>
+						<TextInput
+							accessibilityLabel={current.freeText.placeholder}
+							editable={!busy}
+							value={draft}
+							onChangeText={setDraft}
+							placeholder={current.freeText.placeholder}
+							placeholderTextColor={t.textTertiary}
+							keyboardType={current.freeText.numeric ? "number-pad" : "default"}
+							maxLength={current.freeText.maxLength}
+							returnKeyType="send"
+							onSubmitEditing={sendTyped}
+							maxFontSizeMultiplier={fontScaleCap.body}
+							style={styles.typedInput}
+						/>
+						{draft.trim() ? <Pressable
+							accessibilityRole="button"
+							accessibilityLabel="Send answer"
+							accessibilityState={{ disabled: busy }}
+							disabled={busy}
+							onPress={sendTyped}
+							style={({ pressed }) => [styles.send, pressed && styles.pressed]}
+						>
+							{busy ? <ActivityIndicator size="small" color={t.onAccent} /> : <Feather name="arrow-up" size={16} color={t.onAccent} />}
+						</Pressable> : null}
+					</View> : null}
+				</Animated.View>
+
+				{!current.required && model.kind === "input" && model.requestId ? <Pressable
+					accessibilityRole="button"
+					accessibilityLabel="Skip this question"
+					disabled={busy}
+					onPress={() => { haptics.tap(); if (page < total - 1) goTo(page + 1); else run(onResolveInput(model.requestId ?? "", "accept", values)); }}
+					style={({ pressed }) => [styles.skip, pressed && styles.pressed]}
+				>
+					<Text maxFontSizeMultiplier={fontScaleCap.chrome} style={styles.skipText}>Skip</Text>
+				</Pressable> : null}
+
+				{busy && !draft.trim() ? <View style={styles.busy}><ActivityIndicator size="small" color={t.textTertiary} /></View> : null}
+				{error ? <Text accessibilityRole="alert" maxFontSizeMultiplier={fontScaleCap.chrome} style={styles.error}>{error}</Text> : null}
+			</View>
+		</GestureDetector>
+	);
+}
+
+const makeStyles = (t: Theme) =>
+	StyleSheet.create({
+		card: {
+			backgroundColor: t.bgElevated,
+			borderWidth: StyleSheet.hairlineWidth,
+			borderColor: t.borderDefault,
+			borderRadius: 20,
+			borderCurve: "continuous",
+			paddingHorizontal: 14,
+			paddingTop: 10,
+			paddingBottom: 6,
+		},
+		head: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 26 },
+		pager: { flexDirection: "row", alignItems: "center", gap: 8 },
+		pagerText: { color: t.textSecondary, fontSize: 12, fontWeight: "600", fontVariant: ["tabular-nums"] },
+		eyebrow: { color: t.textSecondary, fontSize: 11, fontWeight: "700", letterSpacing: 0.4, textTransform: "uppercase" },
+		question: { color: t.textPrimary, fontSize: 17, lineHeight: 23, fontWeight: "600", marginTop: 4, marginBottom: 8 },
+		option: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 11 },
+		optionDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.borderSubtle },
+		ordinal: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: t.bgSubtle },
+		ordinalText: { color: t.textSecondary, fontSize: 12, fontWeight: "700" },
+		optionBody: { flex: 1, minWidth: 0, gap: 2 },
+		optionLabel: { color: t.textPrimary, fontSize: 15, lineHeight: 20 },
+		optionHint: { color: t.textTertiary, fontSize: 12, lineHeight: 16 },
+		typed: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 6 },
+		typedInput: { flex: 1, minHeight: 38, color: t.textPrimary, fontSize: 15, paddingVertical: 8 },
+		send: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: t.blue },
+		skip: { alignSelf: "flex-start", paddingVertical: 8, paddingHorizontal: 2 },
+		skipText: { color: t.textSecondary, fontSize: 13, fontWeight: "600" },
+		openForm: { flexDirection: "row", alignItems: "center", gap: 7, paddingVertical: 10 },
+		openFormText: { color: t.blue, fontSize: 14, fontWeight: "600" },
+		busy: { paddingVertical: 8, alignItems: "center" },
+		error: { color: t.red, fontSize: 12, lineHeight: 16, paddingBottom: 6 },
+		pressed: { opacity: 0.6 },
+		dim: { opacity: 0.5 },
+	});
