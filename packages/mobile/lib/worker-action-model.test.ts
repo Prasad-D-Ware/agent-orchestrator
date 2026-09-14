@@ -94,18 +94,21 @@ describe("workerActionGlyph", () => {
 	// rows that don't.
 	it("gives every action a glyph", () => {
 		for (const id of ["pin", "unpin", "rename", "delete", "open", "openPr", "resume", "restore"] as const) {
-			expect(workerActionGlyph(id)).toBeTruthy();
+			expect(workerActionGlyph(id).name).toBeTruthy();
 		}
 	});
 
-	it("does not draw pin and unpin the same way", () => {
-		expect(workerActionGlyph("pin")).not.toBe(workerActionGlyph("unpin"));
+	// The swipe rail already offers pin and unpin with a pushpin; a menu that drew
+	// the same action differently would read as a different action.
+	it("pins with the same pushpin family the swipe rail uses", () => {
+		expect(workerActionGlyph("pin")).toEqual({ family: "material", name: "pin" });
+		expect(workerActionGlyph("unpin")).toEqual({ family: "material", name: "pin-outline" });
 	});
 
 	// Destructive and recovery actions are the ones you must not confuse.
 	it("keeps delete, resume and restore distinct", () => {
-		const glyphs = [workerActionGlyph("delete"), workerActionGlyph("resume"), workerActionGlyph("restore")];
-		expect(new Set(glyphs).size).toBe(3);
+		const names = [workerActionGlyph("delete"), workerActionGlyph("resume"), workerActionGlyph("restore")].map((glyph) => glyph.name);
+		expect(new Set(names).size).toBe(3);
 	});
 });
 
