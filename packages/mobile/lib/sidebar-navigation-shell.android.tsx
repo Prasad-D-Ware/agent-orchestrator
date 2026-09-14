@@ -122,15 +122,13 @@ export function SidebarNavigationShell({ children }: { children: ReactNode }) {
 
 	const panResponder = useMemo(
 		() => PanResponder.create({
-			// Attached only while the drawer is open, so this only ever decides a
-			// close. Opening is the header's menu button: an edge strip would be
-			// arbitrating with the system back gesture over the same 64pt.
 			onMoveShouldSetPanResponderCapture: (event, gesture) =>
 				shouldCaptureSidebarGesture({
 					open,
 					startX: event.nativeEvent.pageX - gesture.dx,
 					dx: gesture.dx,
 					dy: gesture.dy,
+					edgeWidth: 64,
 				}),
 			onPanResponderGrant: () => {
 				gestureStartedOpen.current = open;
@@ -295,6 +293,7 @@ export function SidebarNavigationShell({ children }: { children: ReactNode }) {
 					</View>
 				</Animated.View>
 
+				{!open ? <View style={styles.edgeGestureTarget} {...panResponder.panHandlers} /> : null}
 			</View>
 		</SidebarNavigationContext.Provider>
 	);
@@ -375,6 +374,15 @@ const makeStyles = (t: Theme) => StyleSheet.create({
 	dismissLayer: {
 		...StyleSheet.absoluteFill,
 		backgroundColor: t.scrim,
+	},
+	edgeGestureTarget: {
+		position: "absolute",
+		left: 0,
+		// Leave both the header control and the floating footer actions tappable;
+		// edge swipes only need the page-content strip between them.
+		top: 96,
+		bottom: 88,
+		width: 64,
 	},
 	sidebar: { flex: 1, paddingHorizontal: 16, backgroundColor: t.bgSide },
 	sidebarTop: { height: 232 },

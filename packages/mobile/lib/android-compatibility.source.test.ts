@@ -12,18 +12,14 @@ describe("Android native compatibility boundaries", () => {
 		expect(existsSync(path)).toBe(true);
 		const android = existsSync(path) ? source("./sidebar-navigation-shell.android.tsx") : "";
 		expect(android).toContain("PanResponder");
-		// The drawer opens from the header's menu button, not an edge strip: with
-		// predictive back enabled the system owns that edge, and two gestures
-		// arbitrating over the same 64pt is worse than one obvious control.
-		// Swipe-to-close starts inside the open drawer and conflicts with nothing.
-		expect(android).not.toContain("edgeGestureTarget");
-		expect(android).toContain("(open ? panResponder.panHandlers : {})");
+		expect(android).toContain("edgeGestureTarget");
 		expect(android).toContain("retainedDrawerOpen");
 		expect(android).not.toContain("DrawerLayoutAndroid");
 		expect(android).not.toContain("@expo/ui");
 		expect(android).not.toContain("RNHostView");
 		expect(android).toContain('pointerEvents={open ? "auto" : "none"}');
 		expect(android).toContain('importantForAccessibility={open ? "yes" : "no-hide-descendants"}');
+		expect(android).toMatch(/edgeGestureTarget:[\s\S]*bottom:\s*88/);
 	});
 
 	it("uses Android-native pressable icon controls rather than Unicode Expo buttons", () => {
