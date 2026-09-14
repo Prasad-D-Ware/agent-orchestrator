@@ -396,6 +396,7 @@ export function ChatSessionScreen({ session }: { session: MobileChatSession }) {
 			<ChatComposer
 				sessionId={session.id}
 				snapshot={snapshot}
+				quotaActive={Boolean(quota)}
 				skills={conversation.skills}
 				filePaths={filePaths}
 				filePathsTruncated={filePathsTruncated}
