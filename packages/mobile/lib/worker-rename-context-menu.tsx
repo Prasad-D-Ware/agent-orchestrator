@@ -12,6 +12,11 @@ const DRAWABLES: Partial<Record<WorkerActionId, number>> = {
 	pin: require("../assets/icons/pin.xml"),
 	unpin: require("../assets/icons/unpin.xml"),
 	rename: require("../assets/icons/rename.xml"),
+	open: require("../assets/icons/open.xml"),
+	resume: require("../assets/icons/resume.xml"),
+	restore: require("../assets/icons/restore.xml"),
+	openPr: require("../assets/icons/openPr.xml"),
+	delete: require("../assets/icons/delete.xml"),
 };
 
 export function WorkerRowContextMenu({

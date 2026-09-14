@@ -151,6 +151,26 @@ export function ChatSessionScreen({ session }: { session: MobileChatSession }) {
 		: projects.find((project) => project.id === session.projectId)?.name;
 	const headerHarness = conversation.snapshot?.harness || session.harness || "Agent";
 	const headerState = conversation.snapshot?.controller.state;
+
+	// The blocking request. It takes the composer's place until it is answered.
+	// Computed here rather than at render because the back-swipe below is a hook
+	// and cannot sit after this screen's early returns.
+	const request = requestDockModel(conversation.snapshot, {
+		approval: conversation.pendingActions.includes("approval"),
+		input: conversation.pendingActions.includes("input"),
+	});
+	const requestDismissed = request ? dismissedRequest === request.sequence : false;
+	// The timeline collapses a request the card is answering to a record of what
+	// was asked — one live set of controls, never two.
+	const answeredBelow = request && !requestDismissed && request.canAnswerInline ? request.sequence : undefined;
+	// The card pages by swipe, and on iOS a left-to-right swipe is also the
+	// screen's back gesture — which won, popping to the board instead of stepping
+	// back a question. Hand that axis to the card, but only while it actually has
+	// pages to move between.
+	const cardPages = request && !requestDismissed && request.canAnswerInline ? request.pages.length : 1;
+	useLayoutEffect(() => {
+		navigation.setOptions({ gestureEnabled: cardPages <= 1 });
+	}, [cardPages, navigation]);
 	useLayoutEffect(() => {
 		if (!headerRightReady) {
 			navigation.setOptions({ headerRight: undefined });
@@ -322,15 +342,6 @@ export function ChatSessionScreen({ session }: { session: MobileChatSession }) {
 	const brokenServers = brokenMcpServers(snapshot);
 	const rolledBack = snapshot.turns.filter((turn) => turn.rolledBack).length;
 	const quota = quotaWarning(snapshot.rateLimits);
-	// The blocking request. It takes the composer's place until it is answered.
-	const request = requestDockModel(snapshot, {
-		approval: conversation.pendingActions.includes("approval"),
-		input: conversation.pendingActions.includes("input"),
-	});
-	const requestDismissed = request ? dismissedRequest === request.sequence : false;
-	// The timeline collapses a request the card is answering to a record of what
-	// was asked — one live set of controls, never two.
-	const answeredBelow = request && !requestDismissed && request.canAnswerInline ? request.sequence : undefined;
 	const compactSupported = can(snapshot, "compaction") && !conversationActionUnsupported("compact", conversation.actionCodes.compact);
 	const mcpReloadSupported = can(snapshot, "mcp_reload") && !conversationActionUnsupported("mcp", conversation.actionCodes.mcp);
 	const steerUnsupported = conversationActionUnsupported("steer", conversation.actionCodes.steer);

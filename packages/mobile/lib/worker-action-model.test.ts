@@ -88,17 +88,13 @@ describe("workerActionSymbol", () => {
 });
 
 describe("hasWorkerActionDrawable", () => {
-	// Android and the fallback menu require() a bundled drawable, and assets/icons
-	// holds only these three. A missing file is a bundle-time failure, not a
-	// blank icon, so the menus must ask before requiring one.
-	it("claims an icon only for the three drawables that exist", () => {
-		expect(hasWorkerActionDrawable("pin")).toBe(true);
-		expect(hasWorkerActionDrawable("unpin")).toBe(true);
-		expect(hasWorkerActionDrawable("rename")).toBe(true);
-		expect(hasWorkerActionDrawable("delete")).toBe(false);
-		expect(hasWorkerActionDrawable("open")).toBe(false);
-		expect(hasWorkerActionDrawable("openPr")).toBe(false);
-		expect(hasWorkerActionDrawable("resume")).toBe(false);
-		expect(hasWorkerActionDrawable("restore")).toBe(false);
+	// Android and the fallback menu require() a bundled drawable, and a missing
+	// file is a bundle-time failure rather than a blank icon — so this list has to
+	// track assets/icons exactly. Every action now ships one, so the Android menu
+	// reads like the iOS one rather than a half-iconned list.
+	it("claims an icon for every action", () => {
+		for (const id of ["pin", "unpin", "rename", "delete", "open", "openPr", "resume", "restore"] as const) {
+			expect(hasWorkerActionDrawable(id)).toBe(true);
+		}
 	});
 });
