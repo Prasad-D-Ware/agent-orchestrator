@@ -94,7 +94,10 @@ export const ChatTimeline = memo(function ChatTimeline({
 
 	useEffect(() => {
 		if (jumpToSequence === undefined) return;
-		const index = groups.findIndex((group) => group.anchor === jumpToSequence);
+		// Match the group that CONTAINS the sequence, not one whose anchor equals
+		// it: a group's anchor is its first item, so an activity partway through a
+		// turn never matched and the jump silently did nothing.
+		const index = groups.findIndex((group) => group.anchor === jumpToSequence || group.items.some((item) => item.sequence === jumpToSequence));
 		if (index >= 0) {
 			followsTail.current = index === 0;
 			setShowJump(!followsTail.current);
