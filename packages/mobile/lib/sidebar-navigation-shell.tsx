@@ -12,7 +12,6 @@ import {
 	type ReactNode,
 } from "react";
 import {
-	AccessibilityInfo,
 	Animated,
 	FlatList,
 	Image,
@@ -43,6 +42,7 @@ import {
 } from "./sidebar-navigation";
 import { sidebarGestureTarget, shouldCaptureSidebarGesture } from "./sidebar-gesture";
 import { SidebarSettingsButton } from "./sidebar-settings-button";
+import { useReducedMotion } from "./useReducedMotion";
 import { SidebarSpawnButton } from "./sidebar-spawn-button";
 import { useApp } from "./store";
 import { statusVisual, type Theme } from "./theme";
@@ -74,13 +74,18 @@ export function SidebarNavigationShell({ children }: { children: ReactNode }) {
 	const t = useTheme();
 	const styles = useThemedStyles(makeStyles);
 	const { scheme } = useThemeState();
-	const { sessions, projects } = useApp();
+	const { sessions, projects, connection } = useApp();
+	// The store keeps the last good sessions when a poll fails — that is what lets
+	// the board show rows with a stale banner rather than blanking. The drawer had
+	// no such tell, so a disconnected phone still listed workers as if they were
+	// live. Same data, so say the same thing about it.
+	const sessionsStale = connection !== "open";
 	const router = useRouter();
 	const pathname = usePathname();
 	const insets = useSafeAreaInsets();
 	const { width } = useWindowDimensions();
 	const [open, setOpen] = useState(false);
-	const [reduceMotion, setReduceMotion] = useState(false);
+	const reduceMotion = useReducedMotion();
 	const [scrollRequest, setScrollRequest] = useState<ScrollRequest | null>(null);
 	const progress = useRef(new Animated.Value(0)).current;
 	const gestureStartedOpen = useRef(false);
@@ -97,20 +102,6 @@ export function SidebarNavigationShell({ children }: { children: ReactNode }) {
 		() => new Map(projects.map((project) => [project.id, project.name])),
 		[projects],
 	);
-
-	useEffect(() => {
-		let mounted = true;
-		void AccessibilityInfo.isReduceMotionEnabled()
-			.then((enabled) => {
-				if (mounted) setReduceMotion(enabled);
-			})
-			.catch(() => {});
-		const subscription = AccessibilityInfo.addEventListener("reduceMotionChanged", setReduceMotion);
-		return () => {
-			mounted = false;
-			subscription.remove();
-		};
-	}, []);
 
 	const animateSidebar = useCallback((nextOpen: boolean) => {
 		setOpen(nextOpen);
@@ -258,11 +249,14 @@ export function SidebarNavigationShell({ children }: { children: ReactNode }) {
 						</Host>
 					</View>
 
-					<RNText style={styles.sectionLabel}>{RECENT_WORKERS_LABEL.toUpperCase()}</RNText>
+					<RNText style={styles.sectionLabel}>
+						{RECENT_WORKERS_LABEL.toUpperCase()}
+						{sessionsStale ? <RNText style={styles.sectionLabelStale}>{"  ·  DISCONNECTED"}</RNText> : null}
+					</RNText>
 					<FlatList
 						data={liveSessions}
 						keyExtractor={(session) => `${session.projectId}:${session.id}`}
-						style={styles.sessionList}
+						style={[styles.sessionList, sessionsStale && styles.sessionListStale]}
 						contentContainerStyle={[
 							liveSessions.length === 0 ? styles.emptySessionList : styles.sessionListContent,
 							{ paddingBottom: insets.bottom + 76 },
@@ -409,6 +403,8 @@ const makeStyles = (t: Theme) =>
 			fontWeight: "700",
 			letterSpacing: 0.7,
 		},
+		sectionLabelStale: { color: t.amber },
+		sessionListStale: { opacity: 0.55 },
 		sessionList: { flex: 1 },
 		sessionListContent: { paddingBottom: 8 },
 		emptySessionList: { flexGrow: 1 },

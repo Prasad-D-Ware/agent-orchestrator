@@ -3,6 +3,7 @@
 // prView.ts / pushStatus.ts.
 import { isArchived } from "./agentsView";
 import type { DashboardSession, OrchestratorLink, ProjectInfo } from "./api";
+import { relativeTime } from "./notificationView";
 import { collectPRs, prLifecycle } from "./prView";
 import { attentionOf, sessionTitle } from "./sessionStatus";
 import { statusVisual, type Theme } from "./theme";
@@ -110,7 +111,6 @@ export type OrchestratorProjectRow = {
 	workers: DashboardSession[];
 	section: OrchestratorProjectSectionKey;
 	action: OrchestratorProjectAction;
-	headline: "Project needs attention" | "Orchestrator is active" | "Orchestrator stopped" | "No orchestrator yet";
 	detail: string;
 	activityAt: string | null;
 	urgency: number;
@@ -204,6 +204,107 @@ function detailFor(state: OrchestratorState, workers: DashboardSession[], zones:
 	return "Ready for coordinated work";
 }
 
+/**
+ * The counts a project row shows as chips, in the order they earn attention.
+ *
+ * `detailFor` already computes these numbers, but spends them on prose in the
+ * quietest style on the row — so the figures you actually scan for are the least
+ * visible thing there. Same numbers, promoted.
+ *
+ * Returns tones rather than colours so this stays theme-free and testable; the
+ * component resolves them through `attentionMetaFor`. That is the same split
+ * agentsView.ts already uses for `boardZoneOf` (pure) vs `zoneMeta(t, zone)`.
+ */
+export type ProjectChipTone = "attention" | "review" | "merge" | "working";
+export type ProjectRowChip = { id: string; label: string; tone: ProjectChipTone };
+
+export function projectRowChips(row: OrchestratorProjectRow): ProjectRowChip[] {
+	if (orchestratorState(row.link) !== "running") return [];
+
+	const zones = zoneCounts(row.workers);
+	const needsYou = (zones.respond ?? 0) + (zones.action ?? 0);
+	const failing = zones.review ?? 0;
+	const ready = readyPullRequests(row.workers);
+	const working = zones.working ?? 0;
+
+	const chips: ProjectRowChip[] = [];
+	// Zero counts are dropped rather than rendered as "0": a row should carry only
+	// the facts that are true of it.
+	if (needsYou) chips.push({ id: "needs-you", label: `${needsYou} need${needsYou === 1 ? "s" : ""} you`, tone: "attention" });
+	if (failing) chips.push({ id: "failing", label: `${failing} failing`, tone: "review" });
+	if (ready) chips.push({ id: "ready", label: `${ready} ready`, tone: "merge" });
+	if (working) chips.push({ id: "working", label: `${working} working`, tone: "working" });
+
+	// Three is the most a phone row can hold without the line wrapping; the order
+	// above means what gets dropped is always the least urgent.
+	return chips.slice(0, 3);
+}
+
+/**
+ * The specific thing blocking a project, for rows in Needs Attention.
+ *
+ * This is the line the row was missing. `showProjectDetail` suppressed the
+ * detail on exactly the rows in the attention section, so the most urgent rows
+ * said the least: "Project needs attention · Needs input" and nothing about
+ * which worker, waiting on what, or for how long.
+ *
+ * Returned as parts, not a joined string, so the component owns the separators
+ * and the typography — and so the test can assert on the worker rather than on
+ * punctuation.
+ */
+export type ProjectBlocker = { worker: string; reason: string; age: string };
+
+const BLOCKER_REASON: Record<string, string> = {
+	respond: "waiting on your reply",
+	action: "waiting on your approval",
+	review: "checks failing",
+	merge: "ready to merge",
+};
+
+export function projectBlockerLine(
+	row: OrchestratorProjectRow,
+	now: number = Date.now(),
+): ProjectBlocker | null {
+	if (row.section !== "attention") return null;
+
+	// Oldest first: the thing that has been blocked longest is the thing to name.
+	const blocked = row.workers
+		.filter((worker) => BLOCKER_REASON[attentionOf(worker)])
+		.sort((a, b) => (a.lastActivityAt ?? "").localeCompare(b.lastActivityAt ?? ""));
+
+	const worker = blocked[0];
+	if (!worker) return null;
+
+	return {
+		worker: sessionTitle(worker),
+		reason: BLOCKER_REASON[attentionOf(worker)] ?? "needs attention",
+		age: worker.lastActivityAt ? relativeTime(worker.lastActivityAt, now) : "",
+	};
+}
+
+/**
+ * The colour of the row's leading status rail.
+ *
+ * Worst state across the orchestrator and its workers, so one glance down the
+ * rail tells you where to look. Replaces the per-row mascot, which was identical
+ * on every row and so could not tell any two of them apart.
+ */
+export type ProjectRailTone = "attention" | "review" | "working" | "idle" | "stopped";
+
+export function projectRailTone(row: OrchestratorProjectRow): ProjectRailTone {
+	const state = orchestratorState(row.link);
+	if (state !== "running") return "stopped";
+
+	if (orchestratorUrgency(row.link?.status) === 0) return "review";
+	if (orchestratorUrgency(row.link?.status) === 1) return "attention";
+
+	const zones = zoneCounts(row.workers);
+	if ((zones.respond ?? 0) + (zones.action ?? 0) > 0) return "attention";
+	if ((zones.review ?? 0) > 0) return "review";
+	if ((zones.working ?? 0) > 0) return "working";
+	return "idle";
+}
+
 function orchestratorUrgency(status?: string | null): number | null {
 	if (status === "stuck" || status === "errored" || status === "ci_failed") return 0;
 	if (status === "needs_input" || status === "changes_requested") return 1;
@@ -243,14 +344,6 @@ export function orchestratorProjectSections(
 		const section: OrchestratorProjectSectionKey =
 			state !== "running" ? "not-running" : hasAttention ? "attention" : "coordinating";
 		const action: OrchestratorProjectAction = state === "running" ? "open" : state === "stopped" ? "resume" : "start";
-		const headline: OrchestratorProjectRow["headline"] =
-			section === "attention"
-				? "Project needs attention"
-				: state === "running"
-					? "Orchestrator is active"
-					: state === "stopped"
-						? "Orchestrator stopped"
-						: "No orchestrator yet";
 		const activityAt = latestTimestamp([link?.updatedAt, ...workers.map((worker) => worker.lastActivityAt)]);
 
 		return {
@@ -259,7 +352,6 @@ export function orchestratorProjectSections(
 			workers,
 			section,
 			action,
-			headline,
 			detail: detailFor(state, workers, zones),
 			activityAt,
 			urgency,

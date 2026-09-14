@@ -1,21 +1,26 @@
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Keyboard, LayoutAnimation, Platform, Pressable, RefreshControl, SectionList, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Keyboard, Platform, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { useKeyboardState } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { DashboardSession } from "../../lib/api";
 import { classifyConnectionFailure, describeConnectionFailure } from "../../lib/connectionError";
 import { tunnelMayHaveRotated } from "../../lib/staleTunnel";
 import { haptics } from "../../lib/haptics";
 import { groupSessions, type BoardSection } from "../../lib/agentsView";
+import { LayoutAnimationConfig } from "react-native-reanimated";
+import { BoardRowTransition } from "../../lib/BoardRowTransition";
+import { StaleBanner } from "../../lib/StaleBanner";
 import { useApp } from "../../lib/store";
+import { UnpairedState } from "../../lib/UnpairedState";
 import type { Theme } from "../../lib/theme";
 import { statusVisual } from "../../lib/theme";
 import { useTheme, useThemedStyles } from "../../lib/ThemeProvider";
 import { useTabScrollToTop } from "../../lib/useTabScrollToTop";
 import { Button, EmptyState, HeaderIconButton, ListSectionHeader, ScreenHeader } from "../../lib/ui";
 import { WorkerDock } from "../../lib/worker-dock";
-import { keyboardOverlap, workerDockKeyboardLayout, workerListBottomInset } from "../../lib/worker-dock-layout";
+import { workerDockKeyboardLayout, workerListBottomInset } from "../../lib/worker-dock-layout";
 import { WorkerControlsSheet } from "../../lib/worker-controls-sheet";
 import {
 	ALL_WORKER_PROJECTS,
@@ -36,21 +41,41 @@ type ListSection =
 	| { zone: "archive"; label: string; color: string; data: DashboardSession[] }
 	| { zone: "search"; label: string; color: string; data: DashboardSession[] };
 
+/**
+ * The board is one flat list, not a SectionList, and that is load-bearing.
+ *
+ * A row moving between sections has to stay mounted for its layout animation to
+ * run. In a SectionList it changes parent, which unmounts and remounts it — so a
+ * pinned row vanished from one section and reappeared in the other instead of
+ * travelling there. Flattened, the same move is a reorder within one array,
+ * which is exactly what LinearTransition animates.
+ */
+type BoardRow =
+	| { kind: "header"; key: string; label: string }
+	| { kind: "archive"; key: string }
+	| { kind: "session"; key: string; session: DashboardSession };
+
 export default function FleetScreen() {
 	const t = useTheme();
 	const styles = useThemedStyles(makeStyles);
 	const router = useRouter();
 	const insets = useSafeAreaInsets();
-	const { height: windowHeight } = useWindowDimensions();
-	const { configured, loading, error, errorStatus, connection, config, refresh, sessions, projects, notificationsUnread, activeEndpoints, kill, renameWorker, setWorkerPinned } =
+	const { configured, loading, error, errorStatus, connection, config, refresh, sessions, projects, notificationsUnread, activeEndpoints, kill, renameWorker, setWorkerPinned, restore, resumeAgent } =
 		useApp();
 	const [refreshing, setRefreshing] = useState(false);
 	const [query, setQuery] = useState("");
 	const [searchRequested, setSearchRequested] = useState(false);
 	const [controlsOpen, setControlsOpen] = useState(false);
 	const [workerProjectId, setWorkerProjectId] = useState(ALL_WORKER_PROJECTS);
-	const [keyboardHeight, setKeyboardHeight] = useState(0);
-	const [keyboardVisible, setKeyboardVisible] = useState(false);
+	// Two selectors rather than the whole state object, so the board re-renders
+	// only when one of these two values actually changes.
+	//
+	// The hook listens on keyboardWillShow / keyboardDidHide — `will`, not `did`.
+	// That is the fix: the Android branch this replaces listened for
+	// keyboardDidShow, which fires only once the IME has finished animating, so
+	// the dock and the list inset arrived a beat after the keyboard had landed.
+	const keyboardHeight = useKeyboardState((state) => state.height);
+	const keyboardVisible = useKeyboardState((state) => state.isVisible);
 	const [renamingWorkerId, setRenamingWorkerId] = useState<string>();
 	const [activeSwipeId, setActiveSwipeId] = useState<string>();
 	const activeSwipeRef = useRef<{ id: string; close(): void } | undefined>(undefined);
@@ -58,7 +83,7 @@ export default function FleetScreen() {
 	// long-running project it is most of the sessions.
 	const [archiveOpen, setArchiveOpen] = useState(false);
 
-	const listRef = useTabScrollToTop<SectionList<DashboardSession, ListSection>>();
+	const listRef = useTabScrollToTop<FlatList<BoardRow>>();
 
 	const projectNames = useMemo(
 		() => new Map(projects.map((project) => [project.id, project.name])),
@@ -109,6 +134,19 @@ export default function FleetScreen() {
 			{ zone: "archive" as const, label: "Archive", color: t.textFaint, data: archiveOpen ? archived : [] },
 		];
 	}, [query, filteredGroups, pinned, sections, archived, archiveOpen, t]);
+
+	// Headers and rows as one array of siblings, so a row changing section is a
+	// reorder rather than an unmount. See BoardRow.
+	const listData = useMemo<BoardRow[]>(
+		() =>
+			listSections.flatMap((section) => [
+				section.zone === "archive"
+					? ({ kind: "archive", key: "header:archive" } as const)
+					: ({ kind: "header", key: `header:${section.zone}`, label: section.label } as const),
+				...section.data.map((session) => ({ kind: "session", key: `${session.projectId}:${session.id}`, session }) as const),
+			]),
+		[listSections],
+	);
 
 	// Turn the poll's raw failure ("401 - missing or invalid connection password")
 	// into the same human copy the pairing screens use, keyed on the cause.
@@ -166,6 +204,23 @@ export default function FleetScreen() {
 		}
 	}, [setWorkerPinned]);
 
+	// Resume restarts a stopped agent; restore brings back a terminated session.
+	// Both are recoveries rather than destructive, so neither asks first — the
+	// failure path is an alert, not a confirmation.
+	const runWorkerRecovery = useCallback(async (session: DashboardSession, kind: "resume" | "restore") => {
+		haptics.tap();
+		try {
+			await (kind === "resume" ? resumeAgent(session.id) : restore(session.id));
+			haptics.success();
+		} catch (cause) {
+			haptics.error();
+			Alert.alert(
+				kind === "resume" ? "Couldn't resume the agent" : "Couldn't restore the session",
+				cause instanceof Error ? cause.message : "Please try again.",
+			);
+		}
+	}, [restore, resumeAgent]);
+
 	const confirmDeleteSession = useCallback((session: DashboardSession) => {
 		haptics.warning();
 		Alert.alert(
@@ -178,48 +233,6 @@ export default function FleetScreen() {
 		);
 	}, [kill]);
 
-	useEffect(() => {
-		if (Platform.OS === "ios") {
-			const updateFromFrame = (event: Parameters<typeof Keyboard.scheduleLayoutAnimation>[0]) => {
-				setKeyboardVisible(event.endCoordinates.height > 0 && event.endCoordinates.screenY < windowHeight);
-				setKeyboardHeight(
-					keyboardOverlap(windowHeight, event.endCoordinates.screenY, event.endCoordinates.height),
-				);
-			};
-			const willChange = Keyboard.addListener("keyboardWillChangeFrame", (event) => {
-				Keyboard.scheduleLayoutAnimation(event);
-				updateFromFrame(event);
-			});
-			const didChange = Keyboard.addListener("keyboardDidChangeFrame", updateFromFrame);
-			const didHide = Keyboard.addListener("keyboardDidHide", () => { setKeyboardVisible(false); setKeyboardHeight(0); });
-			return () => {
-				willChange.remove();
-				didChange.remove();
-				didHide.remove();
-			};
-		}
-
-		const animate = (duration?: number) =>
-			LayoutAnimation.configureNext({
-				duration: duration || 250,
-				update: { type: LayoutAnimation.Types.keyboard },
-			});
-		const show = Keyboard.addListener("keyboardDidShow", (event) => {
-			animate(event.duration);
-			setKeyboardVisible(true);
-			setKeyboardHeight(keyboardOverlap(windowHeight, event.endCoordinates.screenY, event.endCoordinates.height));
-		});
-		const hide = Keyboard.addListener("keyboardDidHide", (event) => {
-			animate(event?.duration);
-			setKeyboardVisible(false);
-			setKeyboardHeight(0);
-		});
-		return () => {
-			show.remove();
-			hide.remove();
-		};
-	}, [windowHeight]);
-
 	const keyboardLayout = workerDockKeyboardLayout(keyboardHeight, insets.bottom, keyboardVisible);
 
 	if (!configured) {
@@ -227,17 +240,7 @@ export default function FleetScreen() {
 			<View style={styles.screen}>
 				<View style={{ height: insets.top }} />
 				<ScreenHeader title="Workers" status={connection} />
-				<EmptyState
-					icon="server"
-					// Where a user who skipped onboarding lands. Deliberately not a
-					// restatement of the welcome screen — they've already read that and
-					// chosen to move past it. This says what is missing and offers the
-					// one action that fixes it, going straight to the scanner rather
-					// than sending them to Settings to hunt for a field.
-					title="No desktop paired"
-					message="Scan the pairing code from AO → Settings → Connect Mobile to drive your agents from here."
-					action={<Button title="Scan pairing code" icon="maximize" onPress={() => router.push("/pair")} />}
-				/>
+				<UnpairedState />
 			</View>
 		);
 	}
@@ -258,43 +261,65 @@ export default function FleetScreen() {
 					/>
 				}
 			/>
+			{/* Above the list rather than inside ListEmptyComponent: the case this
+			    exists for is a populated board whose poll has died. */}
+			<StaleBanner error={!!error} onRetry={onRefresh} />
 
 			{loading && sessions.length === 0 ? (
 				<View style={styles.center}>
 					<ActivityIndicator color={t.blue} />
 				</View>
 			) : (
-				<SectionList
+				/* skipEntering so the first render and every poll-driven rebuild do not
+				   cascade one animation per row. Only rows that arrive after the list is
+				   already on screen animate in — which is the only case worth seeing. */
+				<LayoutAnimationConfig skipEntering>
+				<FlatList
 					ref={listRef}
-					sections={listSections}
-					keyExtractor={(item) => `${item.projectId}:${item.id}`}
+					data={listData}
+					keyExtractor={(item) => item.key}
 					contentContainerStyle={{ paddingBottom: workerListBottomInset(keyboardLayout.dockBottom) }}
-					stickySectionHeadersEnabled={false}
 					keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
 					keyboardShouldPersistTaps="handled"
 					refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.blue} />}
-					renderSectionHeader={({ section }) =>
-						section.zone === "archive" ? (
-							<ArchiveHeader count={archived.length} open={archiveOpen} onToggle={() => setArchiveOpen((v) => !v)} />
-						) : (
-							<ListSectionHeader label={section.label} />
-						)
-					}
-						renderItem={({ item }) => (
-							<WorkerListRow
-								session={item}
-								projectName={projectNames.get(item.projectId)}
-								isRenaming={renamingWorkerId === item.id}
-								activeSwipeId={activeSwipeId}
-								onSwipeOpen={openExclusiveSwipe}
-								onSwipeClose={closeExclusiveSwipe}
-								onRenameStart={() => setRenamingWorkerId(item.id)}
-								onRenameCancel={() => setRenamingWorkerId(undefined)}
-								onRename={(title) => renameWorker(item.id, title)}
-								onSetPinned={(pinned) => updateWorkerPin(item, pinned)}
-								onDelete={() => confirmDeleteSession(item)}
-							/>
-					)}
+					renderItem={({ item }) => {
+						// Headers animate too, so a section appearing or emptying reflows
+						// with the rows rather than snapping around them.
+						if (item.kind === "archive") {
+							return (
+								<BoardRowTransition>
+									<ArchiveHeader count={archived.length} open={archiveOpen} onToggle={() => setArchiveOpen((v) => !v)} />
+								</BoardRowTransition>
+							);
+						}
+						if (item.kind === "header") {
+							return (
+								<BoardRowTransition>
+									<ListSectionHeader label={item.label} />
+								</BoardRowTransition>
+							);
+						}
+						const session = item.session;
+						return (
+							<BoardRowTransition>
+								<WorkerListRow
+									session={session}
+									projectName={projectNames.get(session.projectId)}
+									isRenaming={renamingWorkerId === session.id}
+									activeSwipeId={activeSwipeId}
+									onSwipeOpen={openExclusiveSwipe}
+									onSwipeClose={closeExclusiveSwipe}
+									onRenameStart={() => setRenamingWorkerId(session.id)}
+									onRenameCancel={() => setRenamingWorkerId(undefined)}
+									onRename={(title) => renameWorker(session.id, title)}
+									onSetPinned={(pinned) => updateWorkerPin(session, pinned)}
+									onDelete={() => confirmDeleteSession(session)}
+									onResume={() => runWorkerRecovery(session, "resume")}
+									onRestore={() => runWorkerRecovery(session, "restore")}
+								/>
+							</BoardRowTransition>
+						);
+					}}
 					ListEmptyComponent={
 						query.trim() ? (
 							<EmptyState icon="search" title="No workers found" message={`No workers match “${query.trim()}”.`} />
@@ -329,6 +354,7 @@ export default function FleetScreen() {
 						)
 					}
 				/>
+				</LayoutAnimationConfig>
 			)}
 
 			<View style={[styles.dock, { bottom: keyboardLayout.dockBottom }]}>

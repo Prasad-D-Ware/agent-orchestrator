@@ -2,6 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { useHeaderHeight } from "expo-router/build/react-navigation/elements";
 import { useNavigation, useRouter } from "expo-router";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useKeyboardState } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
 	ActivityIndicator,
@@ -9,7 +10,6 @@ import {
 	InteractionManager,
 	Keyboard,
 	KeyboardAvoidingView,
-	LayoutAnimation,
 	Platform,
 	Pressable,
 	StyleSheet,
@@ -30,6 +30,7 @@ import { dockInset, keyboardVerticalOffset, screenKeyboardAvoidance } from "../s
 import type { Theme } from "../theme";
 import { useTheme, useThemedStyles } from "../ThemeProvider";
 import { getWorkspacePaths, openSessionShell } from "./api";
+import { requestDockModel } from "./requestDockModel";
 import { ChatComposer } from "./ChatComposer";
 import { ChatTimeline } from "./ChatTimeline";
 import { ConversationTitle } from "./ConversationTitle";
@@ -89,13 +90,22 @@ export function ChatSessionScreen({ session }: { session: MobileChatSession }) {
 	const [menuOpen, setMenuOpen] = useState(false);
 	const [jumpToSequence, setJumpToSequence] = useState<number>();
 	const clearJumpToSequence = useCallback(() => setJumpToSequence(undefined), []);
+	// Which request the user pushed aside to type instead. It lives here because
+	// both the composer and the timeline change shape depending on it.
+	const [dismissedRequest, setDismissedRequest] = useState<number>();
+	const restoreRequest = useCallback(() => setDismissedRequest(undefined), []);
 	const [filePaths, setFilePaths] = useState<string[]>([]);
 	const [filePathsTruncated, setFilePathsTruncated] = useState(false);
 	const filePathsRequest = useRef<Promise<{ paths: string[]; truncated: boolean }> | null>(null);
 	const [openingShell, setOpeningShell] = useState(false);
 	const [resuming, setResuming] = useState(false);
-	const [keyboardHeight, setKeyboardHeight] = useState(0);
-	const [keyboardVisible, setKeyboardVisible] = useState(false);
+	// Listens on keyboardWillShow / keyboardDidHide on both platforms. The effect
+	// this replaces took its event names from screenKeyboardAvoidance, which gave
+	// Android keyboardDidShow — fired only after the IME had finished animating,
+	// which is why the composer needed a hand-rolled LayoutAnimation to cover the
+	// gap it left. Reporting early removes the gap rather than animating over it.
+	const keyboardHeight = useKeyboardState((state) => state.height);
+	const keyboardVisible = useKeyboardState((state) => state.isVisible);
 	const turnOptionsRequestedFor = useRef<string | undefined>(undefined);
 	const terminated = "projectName" in session ? Boolean(session.isTerminal) : Boolean(session.isTerminated);
 	const interfaceTransitionActive = mobileInterfaceTransitionIsActive(interfaceSwitch.transition);
@@ -129,29 +139,6 @@ export function ChatSessionScreen({ session }: { session: MobileChatSession }) {
 	);
 
 	useEffect(() => {
-		const platform = Platform.OS === "ios" ? "ios" : "android";
-		const avoidance = screenKeyboardAvoidance(platform, 0, insets.bottom);
-		const animate = (duration?: number) => LayoutAnimation.configureNext({
-			duration: duration || 250,
-			update: { type: LayoutAnimation.Types.keyboard },
-		});
-		const show = Keyboard.addListener(avoidance.showEvent, (event) => {
-			if (Platform.OS === "android") animate(event.duration);
-			setKeyboardVisible(true);
-			setKeyboardHeight(event.endCoordinates.height);
-		});
-		const hide = Keyboard.addListener(avoidance.hideEvent, (event) => {
-			if (Platform.OS === "android") animate(event?.duration);
-			setKeyboardVisible(false);
-			setKeyboardHeight(0);
-		});
-		return () => {
-			show.remove();
-			hide.remove();
-		};
-	}, [insets.bottom]);
-
-	useEffect(() => {
 		if (!conversation.snapshot || turnOptionsRequestedFor.current === session.id) return;
 		turnOptionsRequestedFor.current = session.id;
 		void conversation.loadTurnOptions().catch(() => {});
@@ -164,6 +151,27 @@ export function ChatSessionScreen({ session }: { session: MobileChatSession }) {
 		: projects.find((project) => project.id === session.projectId)?.name;
 	const headerHarness = conversation.snapshot?.harness || session.harness || "Agent";
 	const headerState = conversation.snapshot?.controller.state;
+
+	// The blocking request. It takes the composer's place until it is answered.
+	// Computed here rather than at render because the back-swipe below is a hook
+	// and cannot sit after this screen's early returns.
+	const request = requestDockModel(conversation.snapshot, {
+		approval: conversation.pendingActions.includes("approval"),
+		input: conversation.pendingActions.includes("input"),
+	});
+	const requestDismissed = request ? dismissedRequest === request.sequence : false;
+	// The timeline collapses a request the card is answering to a record of what
+	// was asked — one live set of controls, never two.
+	const answeredBelow = request && !requestDismissed && request.canAnswerInline ? request.sequence : undefined;
+	// On iOS a left-to-right swipe is the screen's back gesture, and it beat the
+	// card's own swipe — you got the board instead of the previous question. The
+	// whole horizontal axis goes to the card while it is up; the header's back
+	// button still leaves the session, and the card's ✕ still returns the
+	// composer, so nothing becomes unreachable.
+	const cardShowing = Boolean(request && !requestDismissed);
+	useLayoutEffect(() => {
+		navigation.setOptions({ gestureEnabled: !cardShowing });
+	}, [cardShowing, navigation]);
 	useLayoutEffect(() => {
 		if (!headerRightReady) {
 			navigation.setOptions({ headerRight: undefined });
@@ -402,10 +410,19 @@ export function ChatSessionScreen({ session }: { session: MobileChatSession }) {
 				onRollback={conversation.rollback}
 				jumpToSequence={jumpToSequence}
 				onJumpHandled={clearJumpToSequence}
+				answeredBelow={answeredBelow}
 			/>
 			<ChatComposer
 				sessionId={session.id}
 				snapshot={snapshot}
+				quotaActive={Boolean(quota)}
+				request={request}
+				requestDismissed={requestDismissed}
+				onRequestDecide={conversation.resolveApproval}
+				onRequestResolveInput={conversation.resolveInput}
+				onShowRequest={setJumpToSequence}
+				onDismissRequest={() => setDismissedRequest(request?.sequence)}
+				onRestoreRequest={restoreRequest}
 				skills={conversation.skills}
 				filePaths={filePaths}
 				filePathsTruncated={filePathsTruncated}

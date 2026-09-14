@@ -8,6 +8,7 @@ import { ActivityIndicator, Image, Keyboard, Pressable, ScrollView, StyleSheet, 
 import { haptics } from "../haptics";
 import type { Theme } from "../theme";
 import { useTheme, useThemedStyles } from "../ThemeProvider";
+import { fontScaleCap } from "../tokens";
 import { MicKey } from "../voice/MicKey";
 import { useVoiceInput } from "../voice/useVoiceInput";
 import { activeTurn, type ChatConfigOption, type ChatImage, type ChatModel, type ChatResource, type ChatSkill, type ConversationSnapshot, type TurnSettings } from "./types";
@@ -21,6 +22,9 @@ import { chatSheetRoute } from "./chatSheetRegistry";
 import { ChatAttachmentMenu } from "./ChatAttachmentMenu";
 import { ChatTurnSettingsControl } from "./ChatTurnSettingsControl";
 import { composerDeliveryPresentation, composerDeliveryRoute, composerPrimaryAction, type ComposerDeliveryIntent } from "./composerDeliveryModel";
+import { contextMeterModel } from "./contextMeter";
+import { RequestCard } from "./RequestCard";
+import type { RequestDockModel } from "./requestDockModel";
 import { createRequestGate } from "./requestGate";
 import { queuedConversationMessages } from "./timelineModel";
 
@@ -57,6 +61,14 @@ export function ChatComposer({
 	onSettings,
 	onConfigOption,
 	bottomInset,
+	quotaActive,
+	request,
+	requestDismissed,
+	onRequestDecide,
+	onRequestResolveInput,
+	onShowRequest,
+	onDismissRequest,
+	onRestoreRequest,
 }: {
 	sessionId: string;
 	snapshot: ConversationSnapshot;
@@ -80,6 +92,17 @@ export function ChatComposer({
 	onSettings(settings: TurnSettings): Promise<void>;
 	onConfigOption(id: string, value: { value: string } | { enabled: boolean }): Promise<ChatConfigOption[]>;
 	bottomInset: number;
+	/** The account-quota banner is up, so the context meter stands down. */
+	quotaActive?: boolean;
+	/** A pending request, which takes the composer's place until it is answered. */
+	request?: RequestDockModel | null;
+	/** The user pushed the request aside to type instead. */
+	requestDismissed?: boolean;
+	onRequestDecide(requestId: string, decisionId: string): Promise<void>;
+	onRequestResolveInput(requestId: string, action: "accept" | "decline" | "cancel", content?: Record<string, unknown>): Promise<void>;
+	onShowRequest(sequence: number): void;
+	onDismissRequest(): void;
+	onRestoreRequest(): void;
 }) {
 	const t = useTheme();
 	const router = useRouter();
@@ -95,6 +118,19 @@ export function ChatComposer({
 	const active = Boolean(activeTurn(snapshot));
 	const queuedMessages = useMemo(() => queuedConversationMessages(snapshot), [snapshot]);
 	const visibleQueuedMessages = useMemo(() => queuedMessages.filter((entry) => !hiddenQueuedTurnIds.has(entry.turnId)), [hiddenQueuedTurnIds, queuedMessages]);
+	// Absent below 70%: a permanent token gauge is chrome nobody reads.
+	const contextMeter = contextMeterModel(snapshot.usage, Boolean(quotaActive));
+	// A blocking question is the next thing to do, so it takes the input's place
+	// rather than pointing at a card somewhere up the timeline.
+	const requestCard = request && !requestDismissed ? (
+		<RequestCard
+			model={request}
+			onDecide={onRequestDecide}
+			onResolveInput={onRequestResolveInput}
+			onShow={onShowRequest}
+			onDismiss={onDismissRequest}
+		/>
+	) : null;
 	const canSteer = snapshot.capabilities?.includes("steer") && !steerUnavailable && active;
 	const canEmbedFiles = snapshot.capabilities?.includes("embedded_context");
 	const hasDraft = Boolean(text.trim());
@@ -238,6 +274,12 @@ export function ChatComposer({
 					<Text numberOfLines={1} style={styles.deliveryNoteText}>{attachments.length ? "Attachments next" : "Sent after this"}</Text>
 					{deliveryPresentation.showSteerAction ? <Pressable accessibilityRole="button" accessibilityLabel="Steer this turn now" disabled={submitting || pending} onPress={() => { haptics.tap(); void submit("steer"); }} style={({ pressed }) => [styles.steerAction, pressed && { opacity: 0.7 }]}><Feather name="corner-up-right" size={14} color={t.blue} /></Pressable> : null}
 				</View> : null}
+				{contextMeter ? <View accessibilityRole="progressbar" accessibilityLabel={`Context window ${contextMeter.percent}% used`} style={styles.contextMeter}>
+					<View style={styles.contextTrack}>
+						<View style={[styles.contextFill, { width: `${contextMeter.fillPercent}%`, backgroundColor: contextMeter.severity === "critical" ? t.red : t.amber }]} />
+					</View>
+					<Text numberOfLines={1} maxFontSizeMultiplier={fontScaleCap.chrome} style={[styles.contextText, { color: contextMeter.severity === "critical" ? t.red : t.amber }]}>{contextMeter.label}</Text>
+				</View> : null}
 			</View>
 			{visibleQueuedMessages.length ? <View accessibilityRole="list" style={styles.queueDock}>
 				{visibleQueuedMessages.map((entry, index) => {
@@ -292,7 +334,17 @@ export function ChatComposer({
 					</View>;
 				})}
 			</View> : null}
-			<View style={[styles.composer, stopped && { opacity: 0.55 }]}>
+			{request && !requestCard ? <Pressable
+				accessibilityRole="button"
+				accessibilityLabel={`${request.title}. Answer it`}
+				onPress={() => { haptics.tap(); onRestoreRequest(); }}
+				style={({ pressed }) => [styles.restore, pressed && { opacity: 0.6 }]}
+			>
+				<Feather name={request.kind === "approval" ? "shield" : "message-circle"} size={12} color={t.amber} />
+				<Text numberOfLines={1} maxFontSizeMultiplier={fontScaleCap.chrome} style={styles.restoreText}>{request.title}</Text>
+				<Text maxFontSizeMultiplier={fontScaleCap.chrome} style={styles.restoreAction}>Answer</Text>
+			</Pressable> : null}
+			{requestCard ?? <View style={[styles.composer, stopped && { opacity: 0.55 }]}>
 				<ChatAttachmentMenu disabled={stopped} canAttachFile={Boolean(canEmbedFiles)} onChoosePhoto={() => void addImage()} onChooseFile={() => void addFile()} />
 				<TextInput
 					accessibilityLabel="Message the agent"
@@ -308,7 +360,7 @@ export function ChatComposer({
 				/>
 				<MicKey circular size={42} state={voice.state} mode={voice.mode} onPressIn={voice.pressIn} onPressOut={voice.pressOut} />
 				{primaryAction === "stop" ? <Pressable accessibilityRole="button" accessibilityLabel="Stop turn" accessibilityState={{ busy: interrupting }} disabled={interrupting} onPress={() => { haptics.tap(); void onInterrupt(); }} style={[styles.stop, interrupting && { opacity: 0.55 }]}>{interrupting ? <ActivityIndicator size="small" color={t.textPrimary} /> : <Feather name="square" size={13} color={t.textPrimary} />}</Pressable> : <Pressable accessibilityRole="button" accessibilityLabel={active ? "Queue message" : "Send message"} accessibilityState={{ disabled: stopped || pending || submitting }} disabled={stopped || pending || submitting || (!text.trim() && attachments.length === 0)} onPress={() => { haptics.tap(); void submit("send"); }} style={({ pressed }) => [styles.send, pressed && { opacity: 0.8 }, (stopped || pending || submitting || (!text.trim() && attachments.length === 0)) && { opacity: 0.35 }]}>{pending || submitting ? <ActivityIndicator size="small" color={t.onAccent} /> : <Feather name="arrow-up" size={17} color={t.onAccent} />}</Pressable>}
-			</View>
+			</View>}
 		</View>
 	);
 }
@@ -325,6 +377,15 @@ const makeStyles = (t: Theme) => StyleSheet.create({
 	attachment: { maxWidth: 180, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: t.bgElevated, borderRadius: 9, borderWidth: 1, borderColor: t.borderSubtle, paddingHorizontal: 9, paddingVertical: 7 },
 	attachmentImage: { width: 28, height: 28, borderRadius: 6, backgroundColor: t.bgSubtle },
 	attachmentName: { flexShrink: 1, color: t.textSecondary, fontSize: 11 },
+	// The way back to a request the user pushed aside to type instead.
+	restore: { flexDirection: "row", alignItems: "center", gap: 7, paddingVertical: 7, paddingHorizontal: 10, borderRadius: 12, backgroundColor: t.tintAmber },
+	restoreText: { flex: 1, minWidth: 0, color: t.amber, fontSize: 12, fontWeight: "700" },
+	restoreAction: { color: t.amber, fontSize: 12, fontWeight: "700", textDecorationLine: "underline" },
+	// Sits at the end of the meta row; the bar carries the reading, the label names it.
+	contextMeter: { flexDirection: "row", alignItems: "center", gap: 6, height: 32, paddingLeft: 8 },
+	contextTrack: { width: 34, height: 4, borderRadius: 2, overflow: "hidden", backgroundColor: t.bgSubtle },
+	contextFill: { height: 4, borderRadius: 2 },
+	contextText: { fontSize: 10, fontWeight: "700" },
 	deliveryNote: { maxWidth: "46%", height: 32, flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 5, paddingRight: 5 },
 	deliveryNoteText: { flexShrink: 1, color: t.textTertiary, fontSize: 10, fontWeight: "600" },
 	steerAction: { width: 30, height: 30, alignItems: "center", justifyContent: "center", borderRadius: 15, backgroundColor: t.tintBlue },
