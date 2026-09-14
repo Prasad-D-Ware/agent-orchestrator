@@ -16,6 +16,7 @@ import {
 	pinSession as apiPinSession,
 	renameSession as apiRenameSession,
 	restoreSession,
+	resumeSessionAgent,
 	sendMessage,
 	unpinSession as apiUnpinSession,
 	type DashboardPR,
@@ -102,6 +103,8 @@ type AppState = {
 	renameWorker: (id: string, displayName: string) => Promise<void>;
 	setWorkerPinned: (id: string, pinned: boolean) => Promise<void>;
 	restore: (id: string) => Promise<void>;
+	/** Restart a stopped agent without restoring a terminated AO session. */
+	resumeAgent: (id: string) => Promise<void>;
 	send: (id: string, message: string) => Promise<void>;
 };
 
@@ -546,6 +549,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		[fetchAll],
 	);
 
+	// Distinct from restore, and the chat screen already relies on the
+	// difference: a terminated AO session is restored, a merely stopped
+	// agent/controller is resumed without resurrecting the session around it.
+	const resumeAgent = useCallback(
+		async (id: string) =>
+			trackFeature("restore", async () => {
+				await resumeSessionAgent(cfgRef.current!, id);
+				await fetchAll();
+			}),
+		[fetchAll],
+	);
+
 	const send = useCallback(async (id: string, message: string) => {
 		await trackFeature("send", () => sendMessage(cfgRef.current!, id, message));
 	}, []);
@@ -587,6 +602,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			renameWorker,
 			setWorkerPinned,
 			restore,
+			resumeAgent,
 			send,
 		}),
 		[
@@ -614,6 +630,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			renameWorker,
 			setWorkerPinned,
 			restore,
+			resumeAgent,
 			send,
 		],
 	);

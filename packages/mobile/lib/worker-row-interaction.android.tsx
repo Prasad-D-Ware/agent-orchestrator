@@ -5,6 +5,7 @@ import { haptics } from "./haptics";
 import { type Theme } from "./theme";
 import { useTheme, useThemedStyles } from "./ThemeProvider";
 import { boundWorkerActionTranslation, WORKER_ACTION_REVEAL_WIDTH, resolveWorkerActionRail } from "./worker-row-swipe-model";
+import type { WorkerActionId } from "./worker-action-model";
 import type { WorkerRowInteractionProps } from "./worker-row-interaction.types";
 
 const GESTURE_DISTANCE = 16;
@@ -23,7 +24,8 @@ export function WorkerRowInteraction({
 	accessibilityLabel,
 	accessibilityHint,
 	onPress,
-	onRenameRequest,
+	actions,
+	onAction,
 	onSwipeOpen,
 	onSwipeClose,
 	onReady,
@@ -31,7 +33,7 @@ export function WorkerRowInteraction({
 	const t = useTheme();
 	const styles = useThemedStyles(makeStyles);
 	const [actionsOpen, setActionsOpen] = useState(false);
-	const [renameMenuVisible, setRenameMenuVisible] = useState(false);
+	const [menuVisible, setMenuVisible] = useState(false);
 	const closeRef = useRef<() => void>(() => {});
 	const translationX = useRef(new Animated.Value(0)).current;
 	const translationXRef = useRef(0);
@@ -83,15 +85,15 @@ export function WorkerRowInteraction({
 		}
 		onPress();
 	}, [actionsOpen, closeActions, onPress]);
-	const showRenameMenu = useCallback(() => {
+	const showMenu = useCallback(() => {
 		if (actionsOpen) closeActions();
 		haptics.tap();
-		setRenameMenuVisible(true);
+		setMenuVisible(true);
 	}, [actionsOpen, closeActions]);
-	const chooseRename = useCallback(() => {
-		setRenameMenuVisible(false);
-		onRenameRequest();
-	}, [onRenameRequest]);
+	const choose = useCallback((id: WorkerActionId) => {
+		setMenuVisible(false);
+		onAction(id);
+	}, [onAction]);
 
 	const gesture = useMemo(() => {
 		let startingOffset = 0;
@@ -118,7 +120,7 @@ export function WorkerRowInteraction({
 			.runOnJS(true)
 			.minDuration(longPressDelayMs)
 			.maxDistance(LONG_PRESS_DISTANCE)
-			.onStart(showRenameMenu);
+			.onStart(showMenu);
 		const tap = Gesture.Tap()
 			.runOnJS(true)
 			.maxDistance(LONG_PRESS_DISTANCE)
@@ -126,7 +128,7 @@ export function WorkerRowInteraction({
 				if (success) handleTap();
 			});
 		return Gesture.Race(pan, longPress, tap);
-	}, [handleTap, moveTo, settleRail, showRenameMenu, trackFinger]);
+	}, [handleTap, moveTo, settleRail, showMenu, trackFinger]);
 
 	return (
 		<>
@@ -156,33 +158,41 @@ export function WorkerRowInteraction({
 
 			<Modal
 				transparent
-				visible={renameMenuVisible}
+				visible={menuVisible}
 				animationType="fade"
-				onRequestClose={() => setRenameMenuVisible(false)}
+				onRequestClose={() => setMenuVisible(false)}
 			>
 				<View style={styles.modalScrim}>
-					<Pressable accessibilityLabel="Dismiss worker options" onPress={() => setRenameMenuVisible(false)} style={StyleSheet.absoluteFill} />
+					<Pressable accessibilityLabel="Dismiss worker options" onPress={() => setMenuVisible(false)} style={StyleSheet.absoluteFill} />
 					<View accessibilityViewIsModal style={styles.menu}>
 						<Text style={styles.menuTitle}>Worker options</Text>
-						<Text numberOfLines={1} style={styles.menuDescription}>Rename this worker in place.</Text>
-						<View style={styles.menuActions}>
-							<Pressable
-								accessibilityRole="button"
-								accessibilityLabel="Rename worker"
-								onPress={chooseRename}
-								style={({ pressed }) => [styles.menuButton, styles.renameButton, pressed && styles.menuButtonPressed]}
-							>
-								<Text style={styles.renameButtonText}>Rename</Text>
-							</Pressable>
-							<Pressable
-								accessibilityRole="button"
-								accessibilityLabel="Cancel worker options"
-								onPress={() => setRenameMenuVisible(false)}
-								style={({ pressed }) => [styles.menuButton, styles.cancelButton, pressed && styles.menuButtonPressed]}
-							>
-								<Text style={styles.cancelButtonText}>Cancel</Text>
-							</Pressable>
+						{/* A real action list now, rather than a Rename/Cancel pair. Rows are
+						    48dp so they clear Material's touch minimum, and the destructive
+						    one is tinted rather than separated, matching the native menu. */}
+						<View style={styles.menuList}>
+							{actions.map((action) => (
+								<Pressable
+									key={action.id}
+									accessibilityRole="button"
+									accessibilityLabel={action.title}
+									onPress={() => choose(action.id)}
+									android_ripple={{ color: action.destructive ? t.tintRed : t.tintBlue }}
+									style={({ pressed }) => [styles.menuRow, pressed && styles.menuButtonPressed]}
+								>
+									<Text style={[styles.menuRowText, action.destructive && styles.menuRowTextDestructive]}>
+										{action.title}
+									</Text>
+								</Pressable>
+							))}
 						</View>
+						<Pressable
+							accessibilityRole="button"
+							accessibilityLabel="Cancel worker options"
+							onPress={() => setMenuVisible(false)}
+							style={({ pressed }) => [styles.menuButton, styles.cancelButton, pressed && styles.menuButtonPressed]}
+						>
+							<Text style={styles.cancelButtonText}>Cancel</Text>
+						</Pressable>
 					</View>
 				</View>
 			</Modal>
@@ -221,12 +231,12 @@ const makeStyles = (t: Theme) =>
 			elevation: 12,
 		},
 		menuTitle: { color: t.textPrimary, fontSize: 20, lineHeight: 25, fontWeight: "700" },
-		menuDescription: { color: t.textSecondary, fontSize: 14, lineHeight: 20 },
-		menuActions: { flexDirection: "row", justifyContent: "flex-end", gap: 10, marginTop: 12 },
-		menuButton: { minHeight: 42, paddingHorizontal: 16, borderRadius: 21, alignItems: "center", justifyContent: "center" },
-		renameButton: { backgroundColor: t.blue },
+		menuList: { marginTop: 6, marginHorizontal: -8 },
+		menuRow: { minHeight: 48, paddingHorizontal: 8, justifyContent: "center", borderRadius: 10 },
+		menuRowText: { color: t.textPrimary, fontSize: 16, lineHeight: 21, fontWeight: "500" },
+		menuRowTextDestructive: { color: t.red },
+		menuButton: { minHeight: 42, paddingHorizontal: 16, borderRadius: 21, alignItems: "center", justifyContent: "center", marginTop: 10, alignSelf: "flex-end" },
 		cancelButton: { backgroundColor: t.bgElevatedHover, borderWidth: StyleSheet.hairlineWidth, borderColor: t.borderDefault },
-		renameButtonText: { color: t.onAccent, fontSize: 14, lineHeight: 18, fontWeight: "700" },
 		cancelButtonText: { color: t.textPrimary, fontSize: 14, lineHeight: 18, fontWeight: "600" },
 		menuButtonPressed: { opacity: 0.76 },
 	});
