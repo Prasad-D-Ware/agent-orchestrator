@@ -9,6 +9,8 @@ import { prLine, workerRowPresentation } from "./agentsView";
 import { toneColor } from "./prView";
 import { statusVisual, type Theme } from "./theme";
 import { useTheme, useThemedStyles } from "./ThemeProvider";
+import { openGitHub } from "./openGitHub";
+import { workerContextActions, type WorkerActionId } from "./worker-action-model";
 import { WorkerRowActions } from "./worker-row-actions";
 import { WorkerRowInteraction } from "./worker-row-interaction";
 import { WORKER_ACTION_REVEAL_WIDTH } from "./worker-row-swipe-model";
@@ -26,6 +28,8 @@ export function WorkerListRow({
 	onRename,
 	onSetPinned,
 	onDelete,
+	onResume,
+	onRestore,
 }: {
 	session: DashboardSession;
 	projectName?: string;
@@ -38,6 +42,10 @@ export function WorkerListRow({
 	onRename(title: string): Promise<void>;
 	onSetPinned(pinned: boolean): Promise<void>;
 	onDelete(): void;
+	/** Restart a stopped agent without resurrecting a terminated session. */
+	onResume(): void;
+	/** Bring a terminated session back. */
+	onRestore(): void;
 }) {
 	const t = useTheme();
 	const styles = useThemedStyles(makeStyles);
@@ -102,6 +110,44 @@ export function WorkerListRow({
 		});
 	};
 
+	// prLine returns display text, not a link, so the url comes off the session.
+	const prUrl = (session.prs?.length ? session.prs[0] : session.pr)?.url ?? null;
+	const terminated = session.isTerminated === true || session.status === "terminated";
+	const contextActions = workerContextActions({
+		pinned: Boolean(session.isPinned),
+		terminated,
+		// A live session whose agent has stopped: exited or crashed, but the AO
+		// session around it is still intact, so resuming is the lighter fix.
+		stopped: !terminated && (session.status === "exited" || session.status === "errored"),
+		hasPr: Boolean(prUrl),
+	});
+
+	const runAction = useCallback((id: WorkerActionId) => {
+		switch (id) {
+			case "open":
+				return openSession();
+			case "pin":
+				return void onSetPinned(true);
+			case "unpin":
+				return void onSetPinned(false);
+			case "rename":
+				haptics.tap();
+				setRenameTitle(row.title);
+				setRenameError(undefined);
+				return onRenameStart();
+			case "resume":
+				return onResume();
+			case "restore":
+				return onRestore();
+			case "openPr":
+				if (prUrl) void openGitHub(prUrl);
+				return;
+			default:
+				return onDelete();
+		}
+	// openSession closes over router and session, both stable enough for a row.
+	}, [onDelete, onRenameStart, onResume, onRestore, onSetPinned, prUrl, row.title]);
+
 	return (
 		<WorkerRowInteraction
 			sessionId={session.id}
@@ -113,14 +159,10 @@ export function WorkerListRow({
 			rowStyle={styles.row}
 			pressedStyle={styles.rowPressed}
 			accessibilityLabel={`${row.title}. ${visual.label}. ${row.project}.`}
-			accessibilityHint="Swipe left for pin and delete actions. Long press to rename."
+			accessibilityHint="Swipe left for pin and delete actions. Long press for more."
 			onPress={openSession}
-			onRenameRequest={() => {
-				haptics.tap();
-				setRenameTitle(row.title);
-				setRenameError(undefined);
-				onRenameStart();
-			}}
+			actions={contextActions}
+			onAction={runAction}
 			onSwipeOpen={onSwipeOpen}
 			onSwipeClose={onSwipeClose}
 			onReady={(close) => { closeActionRailRef.current = close; }}

@@ -44,7 +44,7 @@ export default function FleetScreen() {
 	const styles = useThemedStyles(makeStyles);
 	const router = useRouter();
 	const insets = useSafeAreaInsets();
-	const { configured, loading, error, errorStatus, connection, config, refresh, sessions, projects, notificationsUnread, activeEndpoints, kill, renameWorker, setWorkerPinned } =
+	const { configured, loading, error, errorStatus, connection, config, refresh, sessions, projects, notificationsUnread, activeEndpoints, kill, renameWorker, setWorkerPinned, restore, resumeAgent } =
 		useApp();
 	const [refreshing, setRefreshing] = useState(false);
 	const [query, setQuery] = useState("");
@@ -175,6 +175,23 @@ export default function FleetScreen() {
 		}
 	}, [setWorkerPinned]);
 
+	// Resume restarts a stopped agent; restore brings back a terminated session.
+	// Both are recoveries rather than destructive, so neither asks first — the
+	// failure path is an alert, not a confirmation.
+	const runWorkerRecovery = useCallback(async (session: DashboardSession, kind: "resume" | "restore") => {
+		haptics.tap();
+		try {
+			await (kind === "resume" ? resumeAgent(session.id) : restore(session.id));
+			haptics.success();
+		} catch (cause) {
+			haptics.error();
+			Alert.alert(
+				kind === "resume" ? "Couldn't resume the agent" : "Couldn't restore the session",
+				cause instanceof Error ? cause.message : "Please try again.",
+			);
+		}
+	}, [restore, resumeAgent]);
+
 	const confirmDeleteSession = useCallback((session: DashboardSession) => {
 		haptics.warning();
 		Alert.alert(
@@ -253,6 +270,8 @@ export default function FleetScreen() {
 								onRename={(title) => renameWorker(item.id, title)}
 								onSetPinned={(pinned) => updateWorkerPin(item, pinned)}
 								onDelete={() => confirmDeleteSession(item)}
+								onResume={() => runWorkerRecovery(item, "resume")}
+								onRestore={() => runWorkerRecovery(item, "restore")}
 							/>
 					)}
 					ListEmptyComponent={
