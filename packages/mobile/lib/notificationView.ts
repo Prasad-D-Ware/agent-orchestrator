@@ -4,8 +4,8 @@
 import type { Theme } from "./theme";
 
 export type NotificationVisual = {
-	/** Octicons, the same GitHub vocabulary the renderer draws these with. */
-	icon: "comment" | "git-pull-request" | "git-merge" | "git-pull-request-closed" | "bell";
+	/** lucide icon names, drawn from the renderer's own path data. */
+	icon: "message-square-dot" | "git-pull-request-arrow" | "git-merge" | "git-pull-request-closed" | "bell";
 	color: string;
 	label: string;
 };
@@ -33,9 +33,9 @@ export function notificationSections<T extends { status: string }>(items: readon
 export function notificationVisual(t: Theme, type: string): NotificationVisual {
 	switch (type) {
 		case "needs_input":
-			return { icon: "comment", color: t.amber, label: "Needs input" };
+			return { icon: "message-square-dot", color: t.amber, label: "Needs input" };
 		case "ready_to_merge":
-			return { icon: "git-pull-request", color: t.green, label: "Ready to merge" };
+			return { icon: "git-pull-request-arrow", color: t.green, label: "Ready to merge" };
 		case "pr_merged":
 			// Purple, as this theme's own palette says: "purple = merged (terminal,
 			// not actionable)". It was rendering blue with a generic tick, which

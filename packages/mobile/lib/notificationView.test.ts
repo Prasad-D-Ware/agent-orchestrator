@@ -21,7 +21,7 @@ describe("notificationVisual", () => {
 	});
 
 	it("uses pull-request glyphs for pull-request outcomes", () => {
-		expect(notificationVisual(darkTheme, "ready_to_merge").icon).toBe("git-pull-request");
+		expect(notificationVisual(darkTheme, "ready_to_merge").icon).toBe("git-pull-request-arrow");
 		expect(notificationVisual(darkTheme, "pr_closed_unmerged").icon).toBe("git-pull-request-closed");
 	});
 
