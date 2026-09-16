@@ -4,17 +4,18 @@ import type { SFSymbol } from "sf-symbols-typescript";
 import type { NotificationTypeIconProps } from "./notification-type-icon.types";
 
 const symbols: Record<NotificationTypeIconProps["icon"], SFSymbol> = {
-	"message-circle": "bubble.left",
+	comment: "bubble.left",
 	"git-pull-request": "arrow.triangle.pull",
-	"check-circle": "checkmark.circle",
-	"x-circle": "xmark.circle",
+	"git-merge": "arrow.triangle.merge",
+	// SF Symbols has no closed-pull-request glyph; the cross carries "closed".
+	"git-pull-request-closed": "xmark.circle",
 	bell: "bell",
 };
 
 export function NotificationTypeIcon({ icon, color }: NotificationTypeIconProps) {
 	return (
 		<Host matchContents>
-			<Icon name={symbols[icon]} size={14} color={color} />
+			<Icon name={symbols[icon]} size={15} color={color} />
 		</Host>
 	);
 }

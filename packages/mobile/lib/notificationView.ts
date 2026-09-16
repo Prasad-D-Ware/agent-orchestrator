@@ -4,7 +4,8 @@
 import type { Theme } from "./theme";
 
 export type NotificationVisual = {
-	icon: "message-circle" | "git-pull-request" | "check-circle" | "x-circle" | "bell";
+	/** Octicons, the same GitHub vocabulary the renderer draws these with. */
+	icon: "comment" | "git-pull-request" | "git-merge" | "git-pull-request-closed" | "bell";
 	color: string;
 	label: string;
 };
@@ -32,13 +33,17 @@ export function notificationSections<T extends { status: string }>(items: readon
 export function notificationVisual(t: Theme, type: string): NotificationVisual {
 	switch (type) {
 		case "needs_input":
-			return { icon: "message-circle", color: t.amber, label: "Needs input" };
+			return { icon: "comment", color: t.amber, label: "Needs input" };
 		case "ready_to_merge":
 			return { icon: "git-pull-request", color: t.green, label: "Ready to merge" };
 		case "pr_merged":
-			return { icon: "check-circle", color: t.blue, label: "Merged" };
+			// Purple, as this theme's own palette says: "purple = merged (terminal,
+			// not actionable)". It was rendering blue with a generic tick, which
+			// read as an action still open and matched neither desktop nor the
+			// palette's own rule.
+			return { icon: "git-merge", color: t.purple, label: "Merged" };
 		case "pr_closed_unmerged":
-			return { icon: "x-circle", color: t.red, label: "Closed" };
+			return { icon: "git-pull-request-closed", color: t.red, label: "Closed" };
 		default:
 			return { icon: "bell", color: t.textTertiary, label: type || "Notification" };
 	}

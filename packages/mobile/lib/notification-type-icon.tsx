@@ -1,11 +1,10 @@
-import { RNHostView } from "@expo/ui";
-import { Feather } from "@expo/vector-icons";
+import { Octicons } from "@expo/vector-icons";
 import type { NotificationTypeIconProps } from "./notification-type-icon.types";
 
+/**
+ * No RNHostView: this path is Android's, and hosting a vector glyph inside a
+ * Compose view renders nothing — which is why these rows had no icon at all.
+ */
 export function NotificationTypeIcon({ icon, color }: NotificationTypeIconProps) {
-	return (
-		<RNHostView matchContents>
-			<Feather name={icon} size={14} color={color} />
-		</RNHostView>
-	);
+	return <Octicons name={icon} size={15} color={color} />;
 }

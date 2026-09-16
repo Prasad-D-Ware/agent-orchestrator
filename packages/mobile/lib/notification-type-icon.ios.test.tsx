@@ -9,7 +9,7 @@ import { NotificationTypeIcon } from "./notification-type-icon.ios";
 
 describe("NotificationTypeIcon on iOS", () => {
 	it("hosts the SwiftUI icon before mounting it in a React Native row", () => {
-		const element = NotificationTypeIcon({ icon: "message-circle", color: "#fff" });
+		const element = NotificationTypeIcon({ icon: "comment", color: "#fff" });
 
 		expect(element.type).toBe(Host);
 		expect(element.props.matchContents).toBe(true);
