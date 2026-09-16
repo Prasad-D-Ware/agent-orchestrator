@@ -64,7 +64,7 @@ export function SpawnComposerControls({
 
 			<Pressable
 				accessibilityRole="button"
-				accessibilityLabel={busy ? "Spawning worker" : "Spawn worker"}
+				accessibilityLabel={busy ? "Starting task" : "Start task"}
 				accessibilityState={{ disabled }}
 				testID="spawn-submit"
 				disabled={disabled}
@@ -73,7 +73,7 @@ export function SpawnComposerControls({
 				style={[styles.spawn, { opacity: disabled ? 0.68 : 1 }]}
 			>
 				{busy ? <ActivityIndicator size="small" color={t.onAccent} /> : null}
-				<Text style={styles.spawnLabel}>{busy ? "Spawning…" : "Spawn"}</Text>
+				<Text style={styles.spawnLabel}>{busy ? "Starting…" : "Start task"}</Text>
 			</Pressable>
 
 			<OptionSheet
