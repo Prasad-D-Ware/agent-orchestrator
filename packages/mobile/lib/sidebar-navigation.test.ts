@@ -47,10 +47,10 @@ describe("sidebar navigation", () => {
 
 	it("exposes one projects destination backed by the project inbox", () => {
 		expect(sidebarDestinations).toEqual([
-			{ id: "projects", label: "Projects", icon: "folder", href: "/projects" },
-			{ id: "agents", label: "Workers", icon: "activity", href: "/" },
-			{ id: "prs", label: "Pull Requests", icon: "git-pull-request", href: "/prs" },
-			{ id: "settings", label: "Settings", icon: "settings", href: "/settings" },
+			{ id: "projects", label: "Projects", href: "/projects" },
+			{ id: "agents", label: "Workers", href: "/" },
+			{ id: "prs", label: "Pull Requests", href: "/prs" },
+			{ id: "settings", label: "Settings", href: "/settings" },
 		]);
 	});
 

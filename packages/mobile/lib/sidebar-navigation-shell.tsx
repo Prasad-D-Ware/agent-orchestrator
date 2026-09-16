@@ -369,7 +369,7 @@ function DestinationRow({
 					backgroundColor: active ? t.tintBlue : "transparent",
 				}}
 			>
-				<SidebarDestinationIcon destination={destination} color={active ? t.blue : t.textSecondary} />
+				<SidebarDestinationIcon destination={destination} active={active} color={active ? t.blue : t.textSecondary} />
 				<Text textStyle={{ color: active ? t.blue : t.textPrimary, fontSize: 17, fontWeight: active ? "700" : "600" }}>
 					{destination.label}
 				</Text>

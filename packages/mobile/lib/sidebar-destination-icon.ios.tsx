@@ -2,19 +2,27 @@ import { Icon } from "@expo/ui";
 import type { SFSymbol } from "sf-symbols-typescript";
 import type { SidebarDestination, SidebarDestinationId } from "./sidebar-navigation";
 
-const symbols: Record<SidebarDestinationId, SFSymbol> = {
-	projects: "folder",
-	agents: "bolt.horizontal.circle",
-	prs: "arrow.triangle.pull",
-	settings: "gearshape",
+/**
+ * Outline when idle, filled when selected — the iOS tab-bar idiom, which the
+ * drawer was not using. Workers was `bolt.horizontal.circle`, which reads as
+ * throughput rather than agents.
+ */
+const symbols: Record<SidebarDestinationId, { idle: SFSymbol; active: SFSymbol }> = {
+	projects: { idle: "folder", active: "folder.fill" },
+	agents: { idle: "cpu", active: "cpu.fill" },
+	prs: { idle: "arrow.triangle.pull", active: "arrow.triangle.pull" },
+	settings: { idle: "gearshape", active: "gearshape.fill" },
 };
 
 export function SidebarDestinationIcon({
 	destination,
 	color,
+	active = false,
 }: {
 	destination: SidebarDestination;
 	color: string;
+	active?: boolean;
 }) {
-	return <Icon name={symbols[destination.id]} size={21} color={color} />;
+	const symbol = symbols[destination.id];
+	return <Icon name={active ? symbol.active : symbol.idle} size={21} color={color} />;
 }

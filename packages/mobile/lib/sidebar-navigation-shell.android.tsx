@@ -23,6 +23,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AgentLogo } from "./AgentLogo";
+import { SidebarDestinationIcon } from "./sidebar-destination-icon";
 import { MascotLamp } from "./ui";
 import type { DashboardSession } from "./api";
 import { haptics } from "./haptics";
@@ -315,7 +316,7 @@ function DestinationRow({ destination, active, onPress }: {
 				(active || pressed) && { backgroundColor: t.tintBlue },
 			]}
 		>
-			<Feather name={destination.icon} size={21} color={active ? t.blue : t.textSecondary} />
+			<SidebarDestinationIcon destination={destination} active={active} color={active ? t.blue : t.textSecondary} />
 			<Text numberOfLines={1} style={[styles.destinationLabel, active && { color: t.blue, fontWeight: "700" }]}>
 				{destination.label}
 			</Text>
