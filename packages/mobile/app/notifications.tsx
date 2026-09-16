@@ -131,8 +131,6 @@ export default function NotificationsScreen() {
 			<View style={{ height: insets.top }} />
 			<ScreenHeader
 				title="Notifications"
-				subtitle={subtitle}
-				status={connection}
 				left={<HeaderIconButton icon="back" label="Back" onPress={() => router.back()} />}
 				right={
 					unreadCount > 0 ? (

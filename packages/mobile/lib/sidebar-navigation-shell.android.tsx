@@ -14,7 +14,6 @@ import {
 	Animated,
 	BackHandler,
 	FlatList,
-	Image,
 	PanResponder,
 	Pressable,
 	StyleSheet,
@@ -23,8 +22,8 @@ import {
 	View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import MASCOT from "../assets/mascot.png";
 import { AgentLogo } from "./AgentLogo";
+import { MascotLamp } from "./ui";
 import type { DashboardSession } from "./api";
 import { haptics } from "./haptics";
 import { sessionTitle } from "./sessionStatus";
@@ -228,7 +227,7 @@ export function SidebarNavigationShell({ children }: { children: ReactNode }) {
 		>
 			<View style={styles.sidebarTop}>
 				<View style={styles.brandMascotSlot}>
-					<Image source={MASCOT} resizeMode="contain" style={styles.brandMascot} accessibilityLabel="AO mascot" />
+					<MascotLamp status={connection} size={55} />
 				</View>
 				<View style={styles.destinations}>
 					{sidebarDestinations.slice(0, -1).map((destination) => (

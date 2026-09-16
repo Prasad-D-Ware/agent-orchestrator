@@ -129,7 +129,7 @@ export default function ProjectsScreen() {
 		return (
 			<View style={styles.screen}>
 				<View style={{ height: insets.top }} />
-				<ScreenHeader title="Projects" status={connection} />
+				<ScreenHeader title="Projects" />
 				<UnpairedState />
 			</View>
 		);
@@ -140,8 +140,6 @@ export default function ProjectsScreen() {
 			<View style={{ height: insets.top }} />
 			<ScreenHeader
 				title="Projects"
-				subtitle="Ordered by attention"
-				status={connection}
 				right={
 					<HeaderIconButton
 						icon="bell"

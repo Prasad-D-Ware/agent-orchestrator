@@ -242,27 +242,30 @@ export function HeaderIconButton({
 // green when the daemon is reachable and goes dark when it isn't. The tip sits
 // at ~85% across and ~7% down `mascot.png` — where `wandTip`/`wandHalo` below
 // get their offsets from.
-function MascotLamp({ status }: { status?: ConnStatus }) {
+export function MascotLamp({ status, size = 40 }: { status?: ConnStatus; size?: number }) {
 	const t = useTheme();
 	const s = useThemedStyles(makeStyles);
 	const color = status === "open" ? t.green : status === "connecting" ? t.amber : t.textFaint;
 	const lit = status === "open" || status === "connecting";
 	const label = status === "open" ? "Connected" : status === "connecting" ? "Connecting" : "Offline";
+	// Every offset below is a fraction of the artwork's 40x35 box, so the lamp
+	// stays on the wand tip at whatever size the logo is drawn.
+	const k = size / 40;
 	return (
 		<View
-			style={s.mascotWrap}
+			style={[s.mascotWrap, { width: size, height: 35 * k }]}
 			accessible
 			accessibilityRole="image"
 			accessibilityLabel={status ? `AO mascot, ${label}` : "AO mascot"}
 		>
-			<Image source={MASCOT} style={s.mascot} resizeMode="contain" />
+			<Image source={MASCOT} style={{ width: size, height: 35 * k }} resizeMode="contain" />
 			{status ? (
 				<>
 					{/* Halo first, dot on top: RN has no boxShadow, so the glow is a
 					    larger translucent circle plus a platform shadow/elevation. */}
-					{lit ? <View style={[s.wandHalo, { backgroundColor: color, shadowColor: color }]} /> : null}
-					<View style={s.wandTip}>
-						<Dot color={color} size={7} breathing={status === "connecting"} />
+					{lit ? <View style={[s.wandHalo, { left: 26 * k, top: -4 * k, width: 16 * k, height: 16 * k, borderRadius: 8 * k, backgroundColor: color, shadowColor: color }]} /> : null}
+					<View style={[s.wandTip, { left: 30.5 * k }]}>
+						<Dot color={color} size={7 * k} breathing={status === "connecting"} />
 					</View>
 				</>
 			) : null}
@@ -272,18 +275,13 @@ function MascotLamp({ status }: { status?: ConnStatus }) {
 
 export function ScreenHeader({
 	title,
-	subtitle,
 	left,
 	right,
-	status,
 }: {
 	title: string;
-	subtitle?: string;
 	/** Detail routes can supply a back action instead of the sidebar button. */
 	left?: ReactNode;
 	right?: ReactNode;
-	/** Drives the wand-tip lamp. Omit to render the mascot with no lamp. */
-	status?: ConnStatus;
 }) {
 	const s = useThemedStyles(makeStyles);
 	const sidebar = useOptionalSidebarNavigation();
@@ -291,21 +289,9 @@ export function ScreenHeader({
 		<View style={s.screenHeader}>
 			{left ?? (sidebar ? <HeaderIconButton icon="menu" label="Open navigation" onPress={sidebar.openSidebar} /> : null)}
 			<View style={{ flex: 1 }}>
-				<View style={s.titleRow}>
-					<Text maxFontSizeMultiplier={fontScaleCap.title} style={s.screenTitle}>
-						{title}
-					</Text>
-					<MascotLamp status={status} />
-				</View>
-				{subtitle ? (
-					<Text
-						style={s.screenSubtitle}
-						numberOfLines={1}
-						maxFontSizeMultiplier={fontScaleCap.chrome}
-					>
-						{subtitle}
-					</Text>
-				) : null}
+				<Text maxFontSizeMultiplier={fontScaleCap.title} style={s.screenTitle}>
+					{title}
+				</Text>
 			</View>
 			{right}
 		</View>

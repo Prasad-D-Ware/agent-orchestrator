@@ -86,7 +86,7 @@ export function ChatSessionScreen({ session }: { session: MobileChatSession }) {
 			return () => task.cancel();
 		},
 	), [session.id]);
-	const { config, projects, refresh: refreshBoard, setActiveProject, setWorkerPinned } = useApp();
+	const { config, projects, refresh: refreshBoard, setActiveProject, setWorkerPinned, renameWorker } = useApp();
 	const conversation = useMobileConversation(config, session.id);
 	const interfaceSwitch = useInterfaceTransition(config, session.id, refreshBoard);
 	const [menuOpen, setMenuOpen] = useState(false);
@@ -147,7 +147,12 @@ export function ChatSessionScreen({ session }: { session: MobileChatSession }) {
 	}, [conversation.loadTurnOptions, conversation.snapshot, session.id]);
 
 	const sessionName = sessionTitle(session);
-	const title = conversation.snapshot?.title || sessionName;
+	// Desktop derives one name from the session (useWorkspaceQuery: displayName ??
+	// issueId ?? id) and its chat header prefers it over the conversation's own
+	// title (ChatWorkspace: sessionTitle || session.title || snapshot.title). This
+	// had that precedence inverted, so renaming from the board changed the row but
+	// left this header on the agent's auto-generated conversation title.
+	const title = sessionName || conversation.snapshot?.title || session.id;
 	const projectName = "projectName" in session
 		? session.projectName
 		: projects.find((project) => project.id === session.projectId)?.name;
@@ -324,8 +329,8 @@ export function ChatSessionScreen({ session }: { session: MobileChatSession }) {
 			onReload: () => void conversation.reloadMcp().catch(() => {}),
 			onRename: () => router.push(chatSheetRoute({
 				kind: "conversation-rename",
-				initialTitle: current.title ?? "",
-				onRename: (next) => conversation.rename(next),
+				initialTitle: sessionName,
+				onRename: (next) => renameWorker(session.id, next),
 			})),
 			onTogglePin: () => {
 				if ("projectName" in session) return;

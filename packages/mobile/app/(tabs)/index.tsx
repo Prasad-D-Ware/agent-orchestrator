@@ -239,7 +239,7 @@ export default function FleetScreen() {
 		return (
 			<View style={styles.screen}>
 				<View style={{ height: insets.top }} />
-				<ScreenHeader title="Workers" status={connection} />
+				<ScreenHeader title="Workers" />
 				<UnpairedState />
 			</View>
 		);
@@ -250,8 +250,6 @@ export default function FleetScreen() {
 			<View style={{ height: insets.top }} />
 			<ScreenHeader
 				title="Workers"
-				subtitle={config?.host}
-				status={connection}
 				right={
 					<HeaderIconButton
 						icon="bell"

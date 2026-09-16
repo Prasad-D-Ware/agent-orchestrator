@@ -75,7 +75,7 @@ export default function PRsScreen() {
 				{/* Workers and Projects both keep their header in the unpaired state; this
 				    screen dropped it, so the tab lost its title and connection lamp exactly
 				    when a user most needs to know what they are looking at. */}
-				<ScreenHeader title="Pull Requests" status={connection} />
+				<ScreenHeader title="Pull Requests" />
 				<UnpairedState />
 			</View>
 		);
@@ -92,8 +92,6 @@ export default function PRsScreen() {
 			<View style={{ height: insets.top }} />
 			<ScreenHeader
 				title="Pull Requests"
-				subtitle={config?.host}
-				status={connection}
 				right={
 					<HeaderIconButton
 						icon="bell"
