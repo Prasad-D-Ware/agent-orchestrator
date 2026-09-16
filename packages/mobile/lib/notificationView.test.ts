@@ -72,7 +72,7 @@ describe("notificationSections", () => {
 
 		expect(notificationSections([read, unread])).toEqual([
 			{ key: "attention", title: "Needs attention", data: [unread] },
-			{ key: "earlier", title: "Earlier", data: [read] },
+			{ key: "earlier", data: [read] },
 		]);
 	});
 
@@ -80,7 +80,7 @@ describe("notificationSections", () => {
 		const read = { id: "read", status: "read" };
 
 		expect(notificationSections([read])).toEqual([
-			{ key: "earlier", title: "Earlier", data: [read] },
+			{ key: "earlier", data: [read] },
 		]);
 		expect(notificationSections([])).toEqual([]);
 	});

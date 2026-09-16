@@ -12,7 +12,11 @@ export type NotificationVisual = {
 
 export type NotificationSection<T> = {
 	key: "attention" | "earlier";
-	title: "Needs attention" | "Earlier";
+	/**
+	 * Absent for the read group: the split still orders unread first, but the
+	 * rows below it are plainly older and did not need a word to say so.
+	 */
+	title?: "Needs attention";
 	data: T[];
 };
 
@@ -25,7 +29,7 @@ export function notificationSections<T extends { status: string }>(items: readon
 	const earlier = items.filter((item) => item.status !== "unread");
 	const sections: NotificationSection<T>[] = [];
 	if (attention.length > 0) sections.push({ key: "attention", title: "Needs attention", data: attention });
-	if (earlier.length > 0) sections.push({ key: "earlier", title: "Earlier", data: earlier });
+	if (earlier.length > 0) sections.push({ key: "earlier", data: earlier });
 	return sections;
 }
 

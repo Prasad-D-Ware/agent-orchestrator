@@ -219,7 +219,9 @@ export default function NotificationsScreen() {
 						) : null
 					}
 					renderSectionHeader={({ section }) => (
-						<NotificationSectionHeader title={section.title} count={section.data.length} />
+						section.title
+							? <NotificationSectionHeader title={section.title} count={section.data.length} />
+							: null
 					)}
 					renderItem={({ item }) => (
 						<NotificationRow
