@@ -52,7 +52,6 @@ export function ChatComposer({
 	pending,
 	interrupting,
 	disabled,
-	error,
 	onSend,
 	onSteer,
 	onPromoteQueuedTurn,
@@ -84,7 +83,6 @@ export function ChatComposer({
 	pending?: boolean;
 	interrupting?: boolean;
 	disabled?: boolean;
-	error?: string;
 	onSend(text: string, attachments?: ChatImage[], resources?: ChatResource[]): Promise<void>;
 	onSteer(text: string): Promise<void>;
 	onPromoteQueuedTurn(turnId: string): Promise<void>;
@@ -266,7 +264,9 @@ export function ChatComposer({
 		<View style={[styles.dock, { paddingBottom: bottomInset }]}>
 			{voice.state === "starting" || voice.state === "recording" ? <View style={styles.voice}><Feather name="mic" size={12} color={t.red} /><Text style={styles.voiceText}>{voice.partial || (voice.state === "starting" ? "Keep holding…" : "Listening…")}</Text></View> : null}
 			{attachments.length ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.attachments}>{attachments.map((item) => <View key={item.id} style={styles.attachment}>{item.kind === "image" ? <Image accessibilityIgnoresInvertColors source={{ uri: `data:${item.image.mimeType};base64,${item.image.data}` }} style={styles.attachmentImage} /> : <Feather name="file-text" size={13} color={t.blue} />}<Text numberOfLines={1} style={styles.attachmentName}>{item.name}</Text><Pressable hitSlop={7} accessibilityLabel={`Remove ${item.name}`} onPress={() => { haptics.tap(); setAttachments((old) => old.filter((candidate) => candidate.id !== item.id)); }}><Feather name="x" size={13} color={t.textTertiary} /></Pressable></View>)}</ScrollView> : null}
-			{error || localError || voice.error ? <Text accessibilityRole="alert" style={styles.error}>{localError || error || voice.error}</Text> : null}
+			{/* Composer-local only. Conversation and action failures are banners above
+			    the timeline; echoing them here showed one failure twice. */}
+			{localError || voice.error ? <Text accessibilityRole="alert" style={styles.error}>{localError || voice.error}</Text> : null}
 			<View style={styles.metaRow}>
 				<View style={styles.settingsSlot}>
 				<ChatTurnSettingsControl snapshot={snapshot} models={models} options={configOptions ?? []} disabled={disabled || stopped || pending || submitting} onSettings={onSettings} onOption={onConfigOption} onOpenFallback={onOpenSettings} />
