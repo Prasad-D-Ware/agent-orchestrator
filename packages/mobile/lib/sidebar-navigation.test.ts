@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { DashboardSession } from "./api";
 import {
 	activeSidebarDestination,
+	sidebarDestinationBadge,
 	RECENT_WORKERS_LABEL,
 	scrollSidebarRefToTop,
 	selectedPrimarySidebarDestination,
@@ -114,5 +115,38 @@ describe("sidebar navigation", () => {
 
 		expect(() => scrollSidebarRefToTop(emptySectionList)).not.toThrow();
 		expect(calls).toEqual([{ y: 0, animated: true }]);
+	});
+});
+
+describe("sidebarDestinationBadge", () => {
+	const session = (over: Partial<DashboardSession> = {}): DashboardSession =>
+		({ id: "s", projectId: "p", lastActivityAt: "2026-09-16T10:00:00Z", ...over }) as DashboardSession;
+
+	// Only the number worth acting on. A total would never fall to zero, and a
+	// badge that is always lit stops being read.
+	it("counts the workers waiting on a person", () => {
+		const sessions = [
+			session({ id: "a", status: "needs_input" }),
+			session({ id: "b", status: "stuck" }),
+			session({ id: "c", status: "working" }),
+		];
+		expect(sidebarDestinationBadge("agents", sessions)).toBe(2);
+	});
+
+	it("shows nothing when nothing is waiting", () => {
+		expect(sidebarDestinationBadge("agents", [session({ status: "working" })])).toBeUndefined();
+		expect(sidebarDestinationBadge("agents", [])).toBeUndefined();
+	});
+
+	it("ignores terminated workers, as the drawer list does", () => {
+		const sessions = [session({ status: "needs_input", isTerminated: true })];
+		expect(sidebarDestinationBadge("agents", sessions)).toBeUndefined();
+	});
+
+	it("badges only Workers", () => {
+		const sessions = [session({ status: "needs_input" })];
+		for (const id of ["projects", "prs", "settings"] as const) {
+			expect(sidebarDestinationBadge(id, sessions)).toBeUndefined();
+		}
 	});
 });

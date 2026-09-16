@@ -31,6 +31,7 @@ import { SidebarDestinationIcon } from "./sidebar-destination-icon";
 import { sidebarDestinationHitModifiers } from "./sidebar-destination-hit-modifiers";
 import {
 	activeSidebarDestination,
+	sidebarDestinationBadge,
 	RECENT_WORKERS_LABEL,
 	selectedPrimarySidebarDestination,
 	sidebarDestinations,
@@ -239,6 +240,7 @@ export function SidebarNavigationShell({ children }: { children: ReactNode }) {
 											key={destination.id}
 											destination={destination}
 											active={destination.id === selectedPrimaryDestination}
+											badge={sidebarDestinationBadge(destination.id, sessions)}
 											onPress={() => selectDestination(destination)}
 											drawerWidth={drawerWidth}
 										/>
@@ -342,11 +344,13 @@ function SessionRow({
 function DestinationRow({
 	destination,
 	active,
+	badge,
 	onPress,
 	drawerWidth,
 }: {
 	destination: SidebarDestination;
 	active: boolean;
+	badge?: number;
 	onPress: () => void;
 	drawerWidth: number;
 }) {
@@ -374,7 +378,11 @@ function DestinationRow({
 					{destination.label}
 				</Text>
 				<Spacer flexible />
-				{active ? <Text textStyle={{ color: t.blue, fontSize: 17, fontWeight: "700" }}>✓</Text> : null}
+				{/* No check: the tinted row and the blue label already say which
+				    destination you are on. The slot carries a count instead — workers
+				    waiting on a person, in amber because it is attention owed and must
+				    read the same on the row you are standing on. */}
+				{badge ? <Text textStyle={{ color: t.amber, fontSize: 15, fontWeight: "700" }}>{String(badge)}</Text> : null}
 			</Row>
 		</Button>
 	);

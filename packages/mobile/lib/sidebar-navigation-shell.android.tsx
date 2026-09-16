@@ -30,6 +30,7 @@ import { haptics } from "./haptics";
 import { sessionTitle } from "./sessionStatus";
 import {
 	activeSidebarDestination,
+	sidebarDestinationBadge,
 	RECENT_WORKERS_LABEL,
 	selectedPrimarySidebarDestination,
 	sidebarNavigationSettled,
@@ -236,6 +237,7 @@ export function SidebarNavigationShell({ children }: { children: ReactNode }) {
 							key={destination.id}
 							destination={destination}
 							active={destination.id === selectedPrimaryDestination}
+							badge={sidebarDestinationBadge(destination.id, sessions)}
 							onPress={() => selectDestination(destination)}
 						/>
 					))}
@@ -297,9 +299,10 @@ export function SidebarNavigationShell({ children }: { children: ReactNode }) {
 	);
 }
 
-function DestinationRow({ destination, active, onPress }: {
+function DestinationRow({ destination, active, badge, onPress }: {
 	destination: SidebarDestination;
 	active: boolean;
+	badge?: number;
 	onPress: () => void;
 }) {
 	const t = useTheme();
@@ -320,7 +323,11 @@ function DestinationRow({ destination, active, onPress }: {
 			<Text numberOfLines={1} style={[styles.destinationLabel, active && { color: t.blue, fontWeight: "700" }]}>
 				{destination.label}
 			</Text>
-			{active ? <Feather name="check" size={21} color={t.blue} /> : null}
+			{/* No check: the tinted row and the blue label already say which
+			    destination you are on, and every drawer worth copying settles for
+			    one or two such signals. The slot carries a count instead — the
+			    workers waiting on a person, which is why you opened the app. */}
+			{badge ? <Text style={styles.destinationBadge}>{badge}</Text> : null}
 		</Pressable>
 	);
 }
@@ -398,6 +405,9 @@ const makeStyles = (t: Theme) => StyleSheet.create({
 		overflow: "hidden",
 	},
 	destinationLabel: { flex: 1, color: t.textPrimary, fontSize: 17, lineHeight: 22, fontWeight: "600" },
+	// Amber, not the selection blue: this is attention owed, and it must read
+	// the same whether or not you are standing on that destination.
+	destinationBadge: { minWidth: 22, textAlign: "center", color: t.amber, fontSize: 13, fontWeight: "700", fontVariant: ["tabular-nums"] },
 	sectionLabel: {
 		paddingTop: 8,
 		paddingBottom: 8,
