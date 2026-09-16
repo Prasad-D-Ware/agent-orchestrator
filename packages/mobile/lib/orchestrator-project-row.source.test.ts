@@ -49,6 +49,21 @@ describe("project row density", () => {
 
 	// OrchestratorRowAction is a fixed 88x44 @expo/ui Host; a narrower column
 	// clips it silently on iOS rather than erroring.
+	// The 88pt column exists for that action alone. A running row holds a 16px
+	// chevron, and reserving the same width left a visible gap between the
+	// timestamp and the card's edge.
+	it("narrows the trailing column when it only holds a chevron", () => {
+		expect(source).toContain("running && styles.trailingCompact");
+		expect(source).toMatch(/trailingCompact:\s*\{\s*width:\s*20/);
+	});
+
+	// The project name is the tap target for the orchestrator; nothing on the row
+	// said so.
+	it("badges the project name as the orchestrator", () => {
+		expect(source).toContain("styles.orchBadge");
+		expect(source).toContain("Orchestrator");
+	});
+
 	it("reserves a trailing column wide enough for the launch action", () => {
 		expect(source).toMatch(/trailing:\s*\{[^}]*width:\s*88/s);
 	});

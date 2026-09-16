@@ -16,6 +16,7 @@ import {
 } from "./orchestratorView";
 import { attentionMetaFor, statusVisual, type Theme } from "./theme";
 import { useTheme, useThemedStyles } from "./ThemeProvider";
+import { fontScaleCap } from "./tokens";
 import { Chip, Dot } from "./ui";
 
 // Tones come from the pure module; colours are resolved here. Same split as
@@ -66,6 +67,13 @@ export function OrchestratorProjectRowView({
 				<Text style={styles.project} numberOfLines={1}>
 					{row.project.name}
 				</Text>
+				{/* Blue is the orchestrator's colour across the app, so the badge says
+				    where the name leads without spending a sentence on it. */}
+				<View style={styles.orchBadge}>
+					<Text maxFontSizeMultiplier={fontScaleCap.chrome} style={styles.orchBadgeText}>
+						Orchestrator
+					</Text>
+				</View>
 				{timestamp ? <Text style={styles.timestamp}>{timestamp}</Text> : null}
 			</View>
 
@@ -129,7 +137,7 @@ export function OrchestratorProjectRowView({
 				{/* One fixed trailing column in every state, so rows share a baseline
 				    instead of wrapping text at two different measures. The action is
 				    88x44 and clips silently on iOS if this is narrower. */}
-				<View style={styles.trailing}>
+				<View style={[styles.trailing, running && styles.trailingCompact]}>
 					{running ? (
 						<Feather name="chevron-right" size={16} color={t.textFaint} />
 					) : (
@@ -188,9 +196,13 @@ const makeStyles = (t: Theme) =>
 		rail: { width: 3, borderRadius: 2, alignSelf: "stretch", minHeight: 34 },
 		main: { flex: 1, minWidth: 0, gap: 5, justifyContent: "center" },
 		trailing: { width: 88, alignItems: "flex-end", justifyContent: "center" },
+		// Only the launch action needs the full column; the chevron does not.
+		trailingCompact: { width: 20 },
 
 		titleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
 		project: { flex: 1, color: t.textPrimary, fontSize: 17, lineHeight: 22, fontWeight: "700", letterSpacing: -0.2 },
+		orchBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, backgroundColor: t.tintBlue },
+		orchBadgeText: { color: t.blue, fontSize: 10, lineHeight: 13, fontWeight: "700", letterSpacing: 0.3 },
 		timestamp: { color: t.textTertiary, fontSize: 12, lineHeight: 16, fontVariant: ["tabular-nums"], fontFamily: t.fontMono },
 
 		chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 5 },
