@@ -2,10 +2,10 @@ import { Feather } from "@expo/vector-icons";
 import { useCallback, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Directions, Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
+import Animated, { SlideInLeft, SlideInRight, SlideOutLeft, SlideOutRight } from "react-native-reanimated";
 
 import { haptics } from "../haptics";
-import { CROSSFADE_MS } from "../motion";
+import { PAGE_SLIDE_MS } from "../motion";
 import type { Theme } from "../theme";
 import { useTheme, useThemedStyles } from "../ThemeProvider";
 import { fontScaleCap } from "../tokens";
@@ -44,6 +44,9 @@ export function RequestCard({
 	const [draft, setDraft] = useState("");
 	const [submitting, setSubmitting] = useState(false);
 	const [error, setError] = useState<string>();
+	// Which way the next page should travel: forward pages come in from the
+	// right, back pages from the left, so the motion agrees with the swipe.
+	const [forward, setForward] = useState(true);
 
 	const total = model.pages.length;
 	const current: RequestDockPage | undefined = model.pages[page];
@@ -51,11 +54,12 @@ export function RequestCard({
 
 	const goTo = useCallback((next: number) => {
 		if (next < 0 || next >= total) return;
+		setForward(next > page);
 		haptics.select();
 		setError(undefined);
 		setDraft("");
 		setPage(next);
-	}, [total]);
+	}, [page, total]);
 
 	// A fling is enough for "swipe between questions" and never competes with the
 	// vertical scroll behind the card.
@@ -65,6 +69,8 @@ export function RequestCard({
 	);
 
 	if (!current) return null;
+
+	const skippable = !current.required && model.kind === "input" && Boolean(model.requestId);
 
 	const run = (work: Promise<void>) => {
 		setSubmitting(true);
@@ -136,15 +142,21 @@ export function RequestCard({
 							<Feather name="chevron-right" size={18} color={page >= total - 1 ? t.textFaint : t.textSecondary} />
 						</Pressable>
 					</View> : <Text maxFontSizeMultiplier={fontScaleCap.chrome} style={styles.eyebrow}>{model.title}</Text>}
-					<Pressable accessibilityRole="button" accessibilityLabel="Dismiss and type instead" hitSlop={10} onPress={() => { haptics.tap(); onDismiss(); }}>
-						<Feather name="x" size={17} color={t.textTertiary} />
-					</Pressable>
+					{/* Skip already offers a way past this question, so the close would be
+					    a second exit beside it. Kept where Skip is absent — an approval, or
+					    a required question — since the card has replaced the composer and
+					    this is the only way back to it. */}
+					{skippable ? null : (
+						<Pressable accessibilityRole="button" accessibilityLabel="Dismiss and type instead" hitSlop={10} onPress={() => { haptics.tap(); onDismiss(); }}>
+							<Feather name="x" size={17} color={t.textTertiary} />
+						</Pressable>
+					)}
 				</View>
 
 				<Animated.View
 					key={page}
-					entering={reduceMotion ? undefined : FadeIn.duration(CROSSFADE_MS)}
-					exiting={reduceMotion ? undefined : FadeOut.duration(CROSSFADE_MS)}
+					entering={reduceMotion ? undefined : (forward ? SlideInRight : SlideInLeft).duration(PAGE_SLIDE_MS)}
+					exiting={reduceMotion ? undefined : (forward ? SlideOutLeft : SlideOutRight).duration(PAGE_SLIDE_MS)}
 				>
 					{current.question ? <Text maxFontSizeMultiplier={fontScaleCap.title} style={styles.question}>{current.question}</Text> : null}
 
@@ -195,7 +207,7 @@ export function RequestCard({
 					</View> : null}
 				</Animated.View>
 
-				{!current.required && model.kind === "input" && model.requestId ? <Pressable
+				{skippable ? <Pressable
 					accessibilityRole="button"
 					accessibilityLabel="Skip this question"
 					disabled={busy}
@@ -223,6 +235,7 @@ const makeStyles = (t: Theme) =>
 			paddingHorizontal: 14,
 			paddingTop: 10,
 			paddingBottom: 6,
+			overflow: "hidden",
 		},
 		head: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 26 },
 		pager: { flexDirection: "row", alignItems: "center", gap: 8 },

@@ -201,8 +201,11 @@ const makeStyles = (t: Theme) =>
 
 		titleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
 		project: { flex: 1, color: t.textPrimary, fontSize: 17, lineHeight: 22, fontWeight: "700", letterSpacing: -0.2 },
-		orchBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, backgroundColor: t.tintBlue },
-		orchBadgeText: { color: t.blue, fontSize: 10, lineHeight: 13, fontWeight: "700", letterSpacing: 0.3 },
+		// Solid neutral fill with the page ground knocked out of the letters: the
+		// badge is a label, not a state, so it stays out of the semantic palette the
+		// rail and chips use to mean something.
+		orchBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, backgroundColor: t.textTertiary },
+		orchBadgeText: { color: t.bgBase, fontSize: 10, lineHeight: 13, fontWeight: "700", letterSpacing: 0.3 },
 		timestamp: { color: t.textTertiary, fontSize: 12, lineHeight: 16, fontVariant: ["tabular-nums"], fontFamily: t.fontMono },
 
 		chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 5 },

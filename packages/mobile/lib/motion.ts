@@ -33,6 +33,13 @@ export const LAYOUT_MS = 220;
 export const BANNER_MS = 180;
 /** Swapping content in place — filter changes, destination changes. */
 export const CROSSFADE_MS = 140;
+
+/**
+ * One paged question leaving while the next arrives, in the direction of the
+ * swipe. Longer than a crossfade because the eye is following a direction here,
+ * not just a change of content.
+ */
+export const PAGE_SLIDE_MS = 200;
 /** A status colour changing on a rail or dot. */
 export const TINT_MS = 200;
 /**
