@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { notificationSections, notificationTarget, notificationVisual, relativeTime } from "./notificationView";
+import { notificationAction, notificationSections, notificationTarget, notificationVisual, relativeTime } from "./notificationView";
 import { darkTheme } from "./theme";
 
 describe("notificationVisual", () => {
@@ -112,5 +112,40 @@ describe("relativeTime", () => {
 
 	it("returns nothing for an unparseable timestamp", () => {
 		expect(relativeTime("not-a-date", now)).toBe("");
+	});
+});
+
+describe("notificationAction", () => {
+	const ready = { terminated: false, sessionsReady: true };
+
+	it("opens the session behind a live notification", () => {
+		expect(notificationAction({ type: "needs_input", sessionId: "s1" }, ready)).toEqual({ kind: "open", sessionId: "s1" });
+		expect(notificationAction({ type: "ready_to_merge", sessionId: "s1" }, ready)).toEqual({ kind: "open", sessionId: "s1" });
+	});
+
+	// The renderer's rule: a paused agent is the only thing a terminated
+	// needs_input row can act on, so it offers restore rather than navigating to
+	// a session with nothing to show.
+	it("offers restore instead of opening a terminated session that wants input", () => {
+		expect(notificationAction({ type: "needs_input", sessionId: "s1" }, { terminated: true, sessionsReady: true }))
+			.toEqual({ kind: "restore", sessionId: "s1" });
+	});
+
+	// ...but a finished PR is still worth reading, so termination does not gate it.
+	it("still opens a terminated session behind a PR outcome", () => {
+		for (const type of ["ready_to_merge", "pr_merged", "pr_closed_unmerged"]) {
+			expect(notificationAction({ type, sessionId: "s1" }, { terminated: true, sessionsReady: true }))
+				.toEqual({ kind: "open", sessionId: "s1" });
+		}
+	});
+
+	it("waits rather than guessing before the board has loaded", () => {
+		expect(notificationAction({ type: "needs_input", sessionId: "s1" }, { terminated: false, sessionsReady: false }))
+			.toEqual({ kind: "none" });
+	});
+
+	it("sends a session-less PR notification to the PR list", () => {
+		expect(notificationAction({ type: "ready_to_merge" }, ready)).toEqual({ kind: "prs" });
+		expect(notificationAction({ type: "needs_input" }, ready)).toEqual({ kind: "none" });
 	});
 });

@@ -73,3 +73,37 @@ export function relativeTime(iso: string, now: number = Date.now()): string {
 	if (days < 7) return `${days}d`;
 	return `${Math.floor(days / 7)}w`;
 }
+
+/**
+ * What tapping a notification should do, given the state of the session behind
+ * it. Ported from the renderer's NotificationItem, which decides this with:
+ *
+ *   offerRestore    = terminated && type === "needs_input"
+ *   canOpenSession  = sessionId && sessionsReady && (!terminated || !offerRestore)
+ *
+ * The distinction it draws is worth keeping: a terminated session behind
+ * "needs input" has a paused agent and nothing to show, so restore is the only
+ * sensible action. A terminated session behind a PR outcome describes work that
+ * already finished — there is nothing to resume, so it stays readable rather
+ * than being gated behind a restore nobody wants.
+ */
+export type NotificationAction =
+	| { kind: "open"; sessionId: string }
+	| { kind: "restore"; sessionId: string }
+	| { kind: "prs" }
+	| { kind: "none" };
+
+export function notificationAction(
+	n: { type: string; sessionId?: string },
+	state: { terminated: boolean; sessionsReady: boolean },
+): NotificationAction {
+	const sessionId = n.sessionId?.trim();
+	// No session to open: a PR outcome still has somewhere useful to go.
+	if (!sessionId) return n.type === "needs_input" ? { kind: "none" } : { kind: "prs" };
+	// The board has not loaded yet, so whether it is terminated is unknown.
+	// Guessing "open" would land on a screen that cannot resolve the session.
+	if (!state.sessionsReady) return { kind: "none" };
+	const offerRestore = state.terminated && n.type === "needs_input";
+	if (offerRestore) return { kind: "restore", sessionId };
+	return { kind: "open", sessionId };
+}

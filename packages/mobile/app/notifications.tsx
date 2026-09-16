@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
 	ActivityIndicator,
+	Alert,
 	Pressable,
 	RefreshControl,
 	SectionList,
@@ -21,7 +22,7 @@ import { haptics } from "../lib/haptics";
 import { NotificationTypeIcon } from "../lib/notification-type-icon";
 import {
 	notificationSections,
-	notificationTarget,
+	notificationAction,
 	notificationVisual,
 	relativeTime,
 } from "../lib/notificationView";
@@ -41,7 +42,8 @@ export default function NotificationsScreen() {
 	const styles = useThemedStyles(makeStyles);
 	const router = useRouter();
 	const insets = useSafeAreaInsets();
-	const { config, connection } = useApp();
+	const { config, connection, sessions, loading: sessionsLoading, restore } = useApp();
+	const [restoringId, setRestoringId] = useState<string>();
 	const now = useNow(MINUTE_MS);
 	const [items, setItems] = useState<NotificationRecord[]>([]);
 	const [loading, setLoading] = useState(true);
@@ -106,7 +108,34 @@ export default function NotificationsScreen() {
 			setUnreadCount((count) => Math.max(0, count - 1));
 			if (config) markNotificationRead(config, notification.id).catch(() => {});
 		}
-		router.navigate(notificationTarget(notification));
+		// What a tap does depends on the session behind it, exactly as the renderer
+		// decides: a terminated agent waiting on input is restored, not opened.
+		const action = notificationAction(notification, sessionState(notification.sessionId));
+		if (action.kind === "open") router.navigate(`/session/${action.sessionId}`);
+		else if (action.kind === "prs") router.navigate("/prs");
+		else if (action.kind === "restore") void restoreSession(action.sessionId);
+	}
+
+	function sessionState(sessionId?: string) {
+		const session = sessionId ? sessions.find((item) => item.id === sessionId) : undefined;
+		return {
+			terminated: Boolean(session?.isTerminated || session?.status === "terminated"),
+			// Without the board we cannot tell a terminated session from a live one,
+			// and guessing lands on a screen that cannot resolve it.
+			sessionsReady: !sessionsLoading && sessions.length > 0,
+		};
+	}
+
+	function restoreSession(sessionId: string) {
+		haptics.warning();
+		setRestoringId(sessionId);
+		void restore(sessionId)
+			.then(() => {
+				haptics.success();
+				router.navigate(`/session/${sessionId}`);
+			})
+			.catch((cause) => Alert.alert("Could not restore session", cause instanceof Error ? cause.message : String(cause)))
+			.finally(() => setRestoringId(undefined));
 	}
 
 	async function markAll() {
@@ -178,7 +207,13 @@ export default function NotificationsScreen() {
 						<NotificationSectionHeader title={section.title} count={section.data.length} />
 					)}
 					renderItem={({ item }) => (
-						<NotificationRow item={item} now={now} onPress={() => open(item)} />
+						<NotificationRow
+							item={item}
+							now={now}
+							action={notificationAction(item, sessionState(item.sessionId)).kind}
+							restoring={restoringId === item.sessionId}
+							onPress={() => open(item)}
+						/>
 					)}
 					ListFooterComponent={
 						loadingMore ? (
@@ -216,7 +251,13 @@ function NotificationSectionHeader({ title, count }: { title: string; count: num
 	);
 }
 
-function NotificationRow({ item, now, onPress }: { item: NotificationRecord; now: number; onPress: () => void }) {
+function NotificationRow({ item, now, action, restoring, onPress }: {
+	item: NotificationRecord;
+	now: number;
+	action: "open" | "restore" | "prs" | "none";
+	restoring: boolean;
+	onPress: () => void;
+}) {
 	const t = useTheme();
 	const styles = useThemedStyles(makeStyles);
 	const visual = notificationVisual(t, item.type);
@@ -225,9 +266,11 @@ function NotificationRow({ item, now, onPress }: { item: NotificationRecord; now
 	return (
 		<Pressable
 			onPress={onPress}
+			disabled={action === "none"}
 			accessibilityRole="button"
-			accessibilityLabel={`${item.title || visual.label}, ${visual.label}`}
-			style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+			accessibilityState={{ disabled: action === "none", busy: restoring }}
+			accessibilityLabel={`${item.title || visual.label}, ${visual.label}${action === "restore" ? ", restores this session" : ""}`}
+			style={({ pressed }) => [styles.row, pressed && action !== "none" && styles.rowPressed, action === "none" && styles.rowInert]}
 		>
 			<View style={styles.rowCopy}>
 				<View style={styles.metaRow}>
@@ -237,6 +280,13 @@ function NotificationRow({ item, now, onPress }: { item: NotificationRecord; now
 					</Text>
 					{unread ? <Dot color={t.blue} size={7} /> : null}
 					<Text style={styles.time}>{relativeTime(item.createdAt, now)}</Text>
+					{/* A terminated agent waiting on input cannot be opened, only
+					    resumed — so the row says which action it is offering. */}
+					{action === "restore" ? (
+						restoring
+							? <ActivityIndicator size="small" color={t.textTertiary} />
+							: <Feather name="rotate-ccw" size={13} color={t.textTertiary} />
+					) : null}
 				</View>
 				<Text style={[styles.title, unread && styles.titleUnread]} numberOfLines={1}>
 					{item.title || visual.label}
@@ -291,6 +341,7 @@ const makeStyles = (t: Theme) =>
 			borderBottomWidth: StyleSheet.hairlineWidth,
 			borderBottomColor: t.borderSubtle,
 		},
+		rowInert: { opacity: 0.55 },
 		rowPressed: { backgroundColor: t.bgElevated },
 		rowCopy: { flex: 1, gap: 3 },
 		metaRow: { flexDirection: "row", alignItems: "center", gap: 8 },
