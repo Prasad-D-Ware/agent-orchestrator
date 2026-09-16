@@ -142,11 +142,22 @@ export function RequestCard({
 							<Feather name="chevron-right" size={18} color={page >= total - 1 ? t.textFaint : t.textSecondary} />
 						</Pressable>
 					</View> : <Text maxFontSizeMultiplier={fontScaleCap.chrome} style={styles.eyebrow}>{model.title}</Text>}
-					{/* Skip already offers a way past this question, so the close would be
-					    a second exit beside it. Kept where Skip is absent — an approval, or
-					    a required question — since the card has replaced the composer and
-					    this is the only way back to it. */}
-					{skippable ? null : (
+					{/* One exit, in one place. Skip takes the corner where it exists;
+					    otherwise — an approval, or a required question — the close holds
+					    it, since the card has replaced the composer and that is the only
+					    way back to it. */}
+					{skippable ? (
+						<Pressable
+							accessibilityRole="button"
+							accessibilityLabel="Skip this question"
+							disabled={busy}
+							hitSlop={10}
+							onPress={() => { haptics.tap(); if (page < total - 1) goTo(page + 1); else run(onResolveInput(model.requestId ?? "", "accept", values)); }}
+							style={({ pressed }) => [styles.skip, pressed && styles.pressed, busy && styles.dim]}
+						>
+							<Text maxFontSizeMultiplier={fontScaleCap.chrome} style={styles.skipText}>Skip</Text>
+						</Pressable>
+					) : (
 						<Pressable accessibilityRole="button" accessibilityLabel="Dismiss and type instead" hitSlop={10} onPress={() => { haptics.tap(); onDismiss(); }}>
 							<Feather name="x" size={17} color={t.textTertiary} />
 						</Pressable>
@@ -207,15 +218,6 @@ export function RequestCard({
 					</View> : null}
 				</Animated.View>
 
-				{skippable ? <Pressable
-					accessibilityRole="button"
-					accessibilityLabel="Skip this question"
-					disabled={busy}
-					onPress={() => { haptics.tap(); if (page < total - 1) goTo(page + 1); else run(onResolveInput(model.requestId ?? "", "accept", values)); }}
-					style={({ pressed }) => [styles.skip, pressed && styles.pressed]}
-				>
-					<Text maxFontSizeMultiplier={fontScaleCap.chrome} style={styles.skipText}>Skip</Text>
-				</Pressable> : null}
 
 				{busy && !draft.trim() ? <View style={styles.busy}><ActivityIndicator size="small" color={t.textTertiary} /></View> : null}
 				{error ? <Text accessibilityRole="alert" maxFontSizeMultiplier={fontScaleCap.chrome} style={styles.error}>{error}</Text> : null}
@@ -252,7 +254,7 @@ const makeStyles = (t: Theme) =>
 		typed: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 6 },
 		typedInput: { flex: 1, minHeight: 38, color: t.textPrimary, fontSize: 15, paddingVertical: 8 },
 		send: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: t.blue },
-		skip: { alignSelf: "flex-start", paddingVertical: 8, paddingHorizontal: 2 },
+		skip: { paddingVertical: 2, paddingHorizontal: 2 },
 		skipText: { color: t.textSecondary, fontSize: 13, fontWeight: "600" },
 		openForm: { flexDirection: "row", alignItems: "center", gap: 7, paddingVertical: 10 },
 		openFormText: { color: t.blue, fontSize: 14, fontWeight: "600" },
