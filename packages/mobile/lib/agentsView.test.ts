@@ -255,6 +255,20 @@ describe("workerRowPresentation", () => {
 		});
 	});
 
+	// A standalone agent session omits projectId on the wire. The missing value
+	// reached `.length` inside render and crashed the entire board, so this is a
+	// regression guard, not a cosmetic assertion.
+	it("labels a session with no project rather than throwing", () => {
+		const row = workerRowPresentation(
+			darkTheme,
+			session({ id: "worker-9", projectId: "", status: "working", displayName: "No project here" }),
+			undefined,
+			Date.parse("2026-09-02T11:00:00Z"),
+		);
+
+		expect(row.project).toBe("Standalone");
+	});
+
 	it("uses elapsed time for an idle worker and falls back to the compact project id", () => {
 		const row = workerRowPresentation(
 			darkTheme,

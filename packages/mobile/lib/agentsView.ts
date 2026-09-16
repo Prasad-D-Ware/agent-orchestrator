@@ -201,7 +201,9 @@ export function workerRowPresentation(
 
 	return {
 		title,
-		project: projectName?.trim() || compactProjectLabel(session.projectId),
+		// A standalone agent session has no project at all, so there is nothing to
+		// abbreviate — say what it is rather than showing an empty slot.
+		project: projectName?.trim() || (session.projectId ? compactProjectLabel(session.projectId) : "Standalone"),
 		branch: showBranch(session.branch, title) ? session.branch : null,
 		trailing: useElapsed ? elapsed : visual.label,
 		trailingKind: useElapsed ? "time" : "status",
