@@ -28,6 +28,7 @@ import { caretNotation, commandOutputText } from "./ansi";
 import { jumpToLatestColors, userMessageSurfaceStyle } from "./chatChrome";
 import { actionControlWidth, requestPresentation } from "./chatPresentation";
 import { workingElapsedLabel } from "./conversationChrome";
+import { providerErrorCopy } from "./providerError";
 import { ElicitationAction, ElicitationChoiceList, ElicitationTextField } from "./elicitation-native-controls";
 import {
 	elicitationPromptCopy,
@@ -868,7 +869,11 @@ function CompactionMarker({ activity }: { activity: ConversationActivity }) {
 function ErrorActivity({ activity }: { activity: ConversationActivity }) {
 	const t = useTheme();
 	const styles = useThemedStyles(makeStyles);
-	return <View style={[styles.errorCard, { borderColor: t.tintRed }]}><Feather name="alert-triangle" size={14} color={t.red} /><View style={{ flex: 1 }}><Text style={styles.errorTitle}>{activity.summary || "Agent error"}</Text>{activity.detail?.error || activity.detail?.message ? <Text selectable style={styles.errorCopy}>{String(activity.detail.error ?? activity.detail.message)}</Text> : null}</View></View>;
+	// Providers set several fields to the same sentence — Codex sends the
+	// usage-limit text as both summary and detail.error — so rendering each in
+	// turn printed one failure twice inside this card. Same rule as the renderer.
+	const { headline, detail } = providerErrorCopy(activity);
+	return <View style={[styles.errorCard, { borderColor: t.tintRed }]}><Feather name="alert-triangle" size={14} color={t.red} /><View style={{ flex: 1 }}><Text style={styles.errorTitle}>{headline}</Text>{detail ? <Text selectable style={styles.errorCopy}>{detail}</Text> : null}</View></View>;
 }
 
 function EmptyConversation({ harness, controller }: { harness: string; controller: string }) {
