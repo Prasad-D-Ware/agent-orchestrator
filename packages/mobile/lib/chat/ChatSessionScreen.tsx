@@ -86,7 +86,7 @@ export function ChatSessionScreen({ session }: { session: MobileChatSession }) {
 			return () => task.cancel();
 		},
 	), [session.id]);
-	const { config, projects, refresh: refreshBoard, setActiveProject, setWorkerPinned, renameWorker } = useApp();
+	const { config, projects, refresh: refreshBoard, setActiveProject, setWorkerPinned, renameWorker, kill } = useApp();
 	const conversation = useMobileConversation(config, session.id);
 	const interfaceSwitch = useInterfaceTransition(config, session.id, refreshBoard);
 	const [menuOpen, setMenuOpen] = useState(false);
@@ -317,6 +317,8 @@ export function ChatSessionScreen({ session }: { session: MobileChatSession }) {
 			interfaceSupported: Boolean(interfaceSwitch.status?.supported),
 			interfaceReason: interfaceSwitch.status?.reason || interfaceSwitch.error,
 			interfaceSwitching: interfaceTransitionActive || interfaceSwitch.starting,
+			// Orchestrators are not deleted from here; the board owns their lifecycle.
+			canDelete: !("projectName" in session),
 			canPin: !("projectName" in session),
 			pinned: "projectName" in session ? false : Boolean(session.isPinned),
 			onMap: () => router.push(chatSheetRoute({ kind: "conversation-map", markers: conversationMarkers(current), onSelect: setJumpToSequence })),
@@ -337,6 +339,19 @@ export function ChatSessionScreen({ session }: { session: MobileChatSession }) {
 				void setWorkerPinned(session.id, !session.isPinned).catch(() => {});
 			},
 			onRefresh: () => void conversation.refresh(),
+			onDelete: () => {
+				haptics.warning();
+				Alert.alert(
+					"Delete session?",
+					`This terminates ${sessionName}. Its conversation and worktree are preserved.`,
+					[
+						{ text: "Cancel", style: "cancel" },
+						// Leave first: the session this screen is showing is about to stop
+						// existing, and the board is where its row disappears from.
+						{ text: "Delete session", style: "destructive", onPress: () => { router.back(); void kill(session.id).catch(() => {}); } },
+					],
+				);
+			},
 		})));
 	}, [conversation, interfaceSwitch, interfaceTransitionActive, keyboardVisible, menuOpen, openShell, openTurnSettings, openingShell, requestInterfaceSwitch, router, session, sessionName, setActiveProject, setWorkerPinned, title]);
 
