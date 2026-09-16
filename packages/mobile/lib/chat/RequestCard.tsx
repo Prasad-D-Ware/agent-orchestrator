@@ -191,7 +191,7 @@ export function RequestCard({
 							>
 								<View style={[styles.ordinal, selected && styles.ordinalSelected]}>
 									{selected
-										? <Feather name="check" size={13} color={t.onAccent} />
+										? <Feather name="check" size={13} color={t.bgBase} />
 										: <Text maxFontSizeMultiplier={fontScaleCap.chrome} style={styles.ordinalText}>{index + 1}</Text>}
 								</View>
 								<View style={styles.optionBody}>
@@ -261,8 +261,10 @@ const makeStyles = (t: Theme) =>
 		optionDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.borderSubtle },
 		ordinal: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: t.bgSubtle },
 		ordinalText: { color: t.textSecondary, fontSize: 12, fontWeight: "700" },
-		ordinalSelected: { backgroundColor: t.blue },
-		optionLabelSelected: { color: t.blue, fontWeight: "600" },
+		// Neutral, like the Orchestrator badge: the filled circle and the check
+		// carry the selection, so it needs no colour of its own.
+		ordinalSelected: { backgroundColor: t.textSecondary },
+		optionLabelSelected: { fontWeight: "700" },
 		optionBody: { flex: 1, minWidth: 0, gap: 2 },
 		optionLabel: { color: t.textPrimary, fontSize: 15, lineHeight: 20 },
 		optionHint: { color: t.textTertiary, fontSize: 12, lineHeight: 16 },
