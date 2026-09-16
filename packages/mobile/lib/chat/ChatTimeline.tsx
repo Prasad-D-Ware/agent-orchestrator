@@ -28,7 +28,7 @@ import { caretNotation, commandOutputText } from "./ansi";
 import { jumpToLatestColors, userMessageSurfaceStyle } from "./chatChrome";
 import { actionControlWidth, requestPresentation } from "./chatPresentation";
 import { workingElapsedLabel } from "./conversationChrome";
-import { providerErrorCopy } from "./providerError";
+import { errorActivityDuplicatesTurn, providerErrorCopy } from "./providerError";
 import { ElicitationAction, ElicitationChoiceList, ElicitationTextField } from "./elicitation-native-controls";
 import {
 	elicitationPromptCopy,
@@ -200,7 +200,14 @@ function ConversationTurnGroup({ group, snapshot, approvalPending, inputPending,
 	onRollback(turnId: string): Promise<number>;
 	answeredBelow?: number;
 }) {
-	const rows = activityRuns(group.items);
+	// A provider failure arrives twice: as an error activity, and again as the
+	// turn's errorMessage below it. The turn keeps it — that line carries the
+	// outcome and the rollback — so the activity restating it is dropped.
+	const turnError = group.turn?.state === "failed" ? group.turn.errorMessage : undefined;
+	const items = turnError
+		? group.items.filter((item) => !(item.kind === "activity" && errorActivityDuplicatesTurn(item, turnError)))
+		: group.items;
+	const rows = activityRuns(items);
 	return <View>{rows.map((row) => row.kind === "activities"
 		? <ActivityRun key={row.key} activities={row.items} />
 		: <TimelineItem key={row.key} item={row.items[0]} sessionId={snapshot.sessionId} approvalPending={approvalPending} inputPending={inputPending} onDecide={onDecide} onResolveInput={onResolveInput} answeredBelow={answeredBelow} />)}

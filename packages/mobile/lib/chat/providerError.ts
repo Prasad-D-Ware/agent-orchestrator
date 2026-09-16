@@ -78,3 +78,21 @@ function parseJsonObjectSuffix(raw: string): Record<string, unknown> | undefined
 		}
 	}
 }
+
+/**
+ * Whether an error activity is just restating the failure its own turn already
+ * reports.
+ *
+ * A provider failure arrives twice: once as an error activity and again as the
+ * turn's errorMessage. Desktop shows the turn's version — headline, message and
+ * a Retry — so the activity is the copy to drop.
+ */
+export function errorActivityDuplicatesTurn(activity: ConversationActivity, turnErrorMessage?: string): boolean {
+	if (activity.activityKind !== "error") return false;
+	const turnError = (turnErrorMessage ?? "").trim();
+	if (!turnError) return false;
+	const { headline, detail } = providerErrorCopy(activity);
+	const summary = String(activity.summary ?? "").trim();
+	const raw = String(activity.detail?.error ?? "").trim();
+	return [headline.trim(), detail?.trim(), summary, raw].some((value) => Boolean(value) && value === turnError);
+}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { providerErrorCopy } from "./providerError";
+import { errorActivityDuplicatesTurn, providerErrorCopy } from "./providerError";
 import type { ConversationActivity } from "./types";
 
 const activity = (over: Partial<ConversationActivity>): ConversationActivity =>
@@ -59,5 +59,30 @@ describe("providerErrorCopy", () => {
 			const raw = 'error {"message":"Usage limit reached","additionalDetails":"Buy credits"} trailing junk';
 			expect(providerErrorCopy(activity({ summary: raw })).headline).toBe("Usage limit reached");
 		});
+	});
+});
+
+describe("errorActivityDuplicatesTurn", () => {
+	const text = "You've hit your usage limit. Upgrade to Pro or try again at 10:29 PM.";
+
+	it("spots the activity restating its turn's failure", () => {
+		const a = activity({ summary: text, detail: { error: text } as ConversationActivity["detail"] });
+		expect(errorActivityDuplicatesTurn(a, text)).toBe(true);
+	});
+
+	it("keeps an activity that says something else", () => {
+		const a = activity({ summary: "A tool crashed" });
+		expect(errorActivityDuplicatesTurn(a, text)).toBe(false);
+	});
+
+	it("keeps everything when the turn reports no error", () => {
+		const a = activity({ summary: text });
+		expect(errorActivityDuplicatesTurn(a, undefined)).toBe(false);
+		expect(errorActivityDuplicatesTurn(a, "   ")).toBe(false);
+	});
+
+	it("only ever drops error activities", () => {
+		const a = activity({ activityKind: "command", summary: text });
+		expect(errorActivityDuplicatesTurn(a, text)).toBe(false);
 	});
 });
