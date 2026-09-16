@@ -57,9 +57,13 @@ export function RequestCard({
 		setForward(next > page);
 		haptics.select();
 		setError(undefined);
-		setDraft("");
+		// Restore what was typed for the page being shown. Clearing it meant
+		// stepping away and back silently discarded an answer already given.
+		const target = model.pages[next];
+		const stored = target?.freeText ? values[target.freeText.name] : undefined;
+		setDraft(stored === undefined || stored === null ? "" : String(stored));
 		setPage(next);
-	}, [page, total]);
+	}, [model.pages, page, total, values]);
 
 	// A fling is enough for "swipe between questions" and never competes with the
 	// vertical scroll behind the card.
@@ -171,23 +175,32 @@ export function RequestCard({
 				>
 					{current.question ? <Text maxFontSizeMultiplier={fontScaleCap.title} style={styles.question}>{current.question}</Text> : null}
 
-					{current.options.map((option, index) => (
-						<Pressable
-							key={option.id}
-							accessibilityRole="button"
-							accessibilityLabel={option.label}
-							accessibilityState={{ disabled: busy }}
-							disabled={busy}
-							onPress={() => { haptics.tap(); answer(option.id); }}
-							style={({ pressed }) => [styles.option, index > 0 && styles.optionDivider, pressed && styles.pressed, busy && styles.dim]}
-						>
-							<View style={styles.ordinal}><Text maxFontSizeMultiplier={fontScaleCap.chrome} style={styles.ordinalText}>{index + 1}</Text></View>
-							<View style={styles.optionBody}>
-								<Text maxFontSizeMultiplier={fontScaleCap.body} style={styles.optionLabel}>{option.label}</Text>
-								{option.description ? <Text maxFontSizeMultiplier={fontScaleCap.body} style={styles.optionHint}>{option.description}</Text> : null}
-							</View>
-						</Pressable>
-					))}
+					{current.options.map((option, index) => {
+						// The answers were always kept — they accumulate until the last
+						// page submits them — but nothing said so on a second visit.
+						const selected = current.propertyName ? values[current.propertyName] === option.id : false;
+						return (
+							<Pressable
+								key={option.id}
+								accessibilityRole="button"
+								accessibilityLabel={option.label}
+								accessibilityState={{ disabled: busy, selected }}
+								disabled={busy}
+								onPress={() => { haptics.tap(); answer(option.id); }}
+								style={({ pressed }) => [styles.option, index > 0 && styles.optionDivider, pressed && styles.pressed, busy && styles.dim]}
+							>
+								<View style={[styles.ordinal, selected && styles.ordinalSelected]}>
+									{selected
+										? <Feather name="check" size={13} color={t.onAccent} />
+										: <Text maxFontSizeMultiplier={fontScaleCap.chrome} style={styles.ordinalText}>{index + 1}</Text>}
+								</View>
+								<View style={styles.optionBody}>
+									<Text maxFontSizeMultiplier={fontScaleCap.body} style={[styles.optionLabel, selected && styles.optionLabelSelected]}>{option.label}</Text>
+									{option.description ? <Text maxFontSizeMultiplier={fontScaleCap.body} style={styles.optionHint}>{option.description}</Text> : null}
+								</View>
+							</Pressable>
+						);
+					})}
 
 					{current.freeText ? <View style={[styles.typed, current.options.length > 0 && styles.optionDivider]}>
 						<View style={styles.ordinal}><Feather name="edit-2" size={12} color={t.textTertiary} /></View>
@@ -248,6 +261,8 @@ const makeStyles = (t: Theme) =>
 		optionDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.borderSubtle },
 		ordinal: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: t.bgSubtle },
 		ordinalText: { color: t.textSecondary, fontSize: 12, fontWeight: "700" },
+		ordinalSelected: { backgroundColor: t.blue },
+		optionLabelSelected: { color: t.blue, fontWeight: "600" },
 		optionBody: { flex: 1, minWidth: 0, gap: 2 },
 		optionLabel: { color: t.textPrimary, fontSize: 15, lineHeight: 20 },
 		optionHint: { color: t.textTertiary, fontSize: 12, lineHeight: 16 },
