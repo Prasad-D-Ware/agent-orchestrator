@@ -38,6 +38,8 @@ import { VERSION_FLOOR } from "../lib/versionFloor";
 
 const ISSUES_URL = "https://github.com/AgentWrapper/agent-orchestrator/issues/new";
 
+export { RouteErrorBoundary as ErrorBoundary } from "../lib/RouteErrorBoundary";
+
 export default function SettingsScreen() {
 	const t = useTheme();
 	const styles = useThemedStyles(makeStyles);

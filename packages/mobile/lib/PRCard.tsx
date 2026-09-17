@@ -32,7 +32,7 @@ export function PRCard({
 	const router = useRouter();
 	const state = summary ? stateVisualOf(t, summary.state as PRLifecycle) : prStateVisual(t, pr);
 	const title = summary?.title?.trim() || prTitle(pr, sessionTitle(session));
-	const project = shortLabel(summary?.repo || session.projectId);
+	const project = shortLabel(summary?.repo || session.projectId || "Standalone");
 	const branches = summary
 		? [summary.sourceBranch, summary.targetBranch].filter(Boolean).join(" → ")
 		: session.branch || "";

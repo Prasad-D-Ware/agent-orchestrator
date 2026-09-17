@@ -15,3 +15,5 @@ export default function ConversationActionsRoute() {
 	};
 	return <ConversationActionsSheet entry={entry} onAction={closeThen} />;
 }
+
+export { SheetErrorBoundary as ErrorBoundary } from "../../lib/RouteErrorBoundary";

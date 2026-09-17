@@ -11,3 +11,5 @@ export default function ConversationRenameRoute() {
 	if (entry?.kind !== "conversation-rename") return null;
 	return <ConversationRenameSheet initialTitle={entry.initialTitle} onRename={entry.onRename} onClose={() => router.back()} />;
 }
+
+export { SheetErrorBoundary as ErrorBoundary } from "../../lib/RouteErrorBoundary";

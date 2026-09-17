@@ -87,3 +87,5 @@ const makeStyles = (t: Theme) => StyleSheet.create({
 	spawnDock: { position: "absolute", left: 16, right: 16, bottom: 16 },
 	spawnHost: { width: "100%", height: 50 },
 });
+
+export { RouteErrorBoundary as ErrorBoundary } from "../../lib/RouteErrorBoundary";
