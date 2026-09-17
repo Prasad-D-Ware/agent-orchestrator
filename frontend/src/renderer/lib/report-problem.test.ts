@@ -151,6 +151,7 @@ describe("report problem drafts", () => {
 			"email",
 		)!;
 
+		expect(email.startsWith("mailto:prasad@untrivial.ai?")).toBe(true);
 		expect(email).toContain("subject=AO%20feedback%3A%20Switch%20Codex%20accounts%20bug");
 		expect(email).toContain("body=AO%20feedback%0A%0ASummary%3A%20Switch%20Codex%20accounts%20bug");
 		expect(email).toContain("Keep%20literal%20%2B%20signs%20safe.");
