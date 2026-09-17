@@ -8,6 +8,7 @@ import { haptics } from "./haptics";
 import { prLine, workerRowPresentation, workerStatusGlyph } from "./agentsView";
 import { toneColor } from "./prView";
 import { statusVisual, type Theme } from "./theme";
+import { rowDividerWidth } from "./divider";
 import { useTheme, useThemedStyles } from "./ThemeProvider";
 import { openGitHub } from "./openGitHub";
 import { workerContextActions, type WorkerActionId } from "./worker-action-model";
@@ -311,7 +312,7 @@ const makeStyles = (t: Theme) =>
 		shell: {
 			minHeight: 76,
 			overflow: "hidden",
-			borderBottomWidth: StyleSheet.hairlineWidth,
+			borderBottomWidth: rowDividerWidth,
 			borderBottomColor: t.borderSubtle,
 		},
 		actionRail: {
