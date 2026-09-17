@@ -126,7 +126,7 @@ export function reportProblemDestinationUrl(
 		url.searchParams.set("cc", SUPPORT_CC_EMAIL);
 		url.searchParams.set("subject", `AO feedback: ${reportTitle(input)}`);
 		url.searchParams.set("body", formatEmailBody(normalizeInput(input), formatDiagnostics(diagnostics)));
-		return url.toString();
+		return url.toString().replaceAll("+", "%20");
 	}
 
 	const title = reportTitle(input);
