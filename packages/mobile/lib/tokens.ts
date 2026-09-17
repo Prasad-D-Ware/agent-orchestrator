@@ -34,7 +34,7 @@ export const space = {
 /**
  * Corner radii.
  *
- * Sources: `7` (orchestrator-project-row workerRow), `12` (cardShell),
+ * Sources: `7` (the former project row's workerRow), `12` (cardShell),
  * `16` (app/settings.tsx card, pinned by settings-density.source.test.ts),
  * `20` (ui.tsx Pill).
  */

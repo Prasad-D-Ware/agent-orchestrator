@@ -385,3 +385,55 @@ export function orchestratorProjectSections(
 		return data.length ? [{ ...definition, data }] : [];
 	});
 }
+
+/**
+ * The one line of counts a project card carries under its name.
+ *
+ * Deliberately a sentence in the quiet text style rather than a row of coloured
+ * chips: the orchestrator button is what the card is for, and chips competing
+ * with it in colour and weight is exactly what the redesign removed. The one
+ * count worth colour — work waiting on a person — is reported separately so the
+ * card can tint it on its own.
+ */
+export type ProjectCardSummary = {
+	/** Live workers in the project, e.g. "3 workers". */
+	workers: string;
+	/** Workers waiting on a person; zero when none. */
+	needsYou: number;
+};
+
+export function projectCardSummary(row: OrchestratorProjectRow): ProjectCardSummary {
+	const count = row.workers.length;
+	const zones = zoneCounts(row.workers);
+	return {
+		workers: count === 0 ? "No workers" : `${count} worker${count === 1 ? "" : "s"}`,
+		needsYou: (zones.respond ?? 0) + (zones.action ?? 0),
+	};
+}
+
+/** What the card's orchestrator button says and does. */
+export type OrchestratorButtonCopy = {
+	label: string;
+	/** Running orchestrators show their state beside the label. */
+	running: boolean;
+};
+
+export function orchestratorButtonCopy(row: OrchestratorProjectRow, busy: boolean): OrchestratorButtonCopy {
+	if (busy) return { label: row.action === "resume" ? "Resuming…" : "Starting…", running: false };
+	switch (row.action) {
+		case "open": return { label: "Open orchestrator", running: true };
+		case "resume": return { label: "Resume orchestrator", running: false };
+		case "start": return { label: "Start orchestrator", running: false };
+	}
+}
+
+/**
+ * Every session a project detail page lists: its workers, archived ones
+ * included. The Workers tab filters by project too, but it is scoped to live
+ * work; a project's own page is where its history belongs, so nothing is dropped
+ * for being finished. The store already keeps orchestrators in a list of their
+ * own, so these are workers only; the page shows the orchestrator above them.
+ */
+export function projectDetailSessions(projectId: string, sessions: readonly DashboardSession[]): DashboardSession[] {
+	return sessions.filter((session) => session.projectId === projectId);
+}

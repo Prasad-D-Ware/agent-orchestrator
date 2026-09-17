@@ -8,7 +8,10 @@ import {
 	orchestratorStatus,
 	orchestratorWorkerAccessibilityLabel,
 	orchestratorWorkerPreviews,
+	orchestratorButtonCopy,
 	projectBlockerLine,
+	projectCardSummary,
+	projectDetailSessions,
 	projectRailTone,
 	projectRowChips,
 	workersOf,
@@ -419,5 +422,58 @@ describe("orchestratorWorkerPreviews", () => {
 		expect(orchestratorWorkerAccessibilityLabel({ id: "worker-2", name: "Review PR", status: "needs_input" }, "Needs input")).toBe(
 			"Open worker Review PR, Needs input",
 		);
+	});
+});
+
+describe("projectCardSummary", () => {
+	const rowFor = (sessions: DashboardSession[]) =>
+		rowByProject(orchestratorProjectSections([project("proj")], sessions, [link()]), "proj");
+
+	it("counts the project's workers in plain words", () => {
+		expect(projectCardSummary(rowFor([session({ id: "proj-1" }), session({ id: "proj-2" })])).workers).toBe("2 workers");
+		expect(projectCardSummary(rowFor([session({ id: "proj-1" })])).workers).toBe("1 worker");
+	});
+
+	it("says so plainly when there are none", () => {
+		expect(projectCardSummary(rowFor([])).workers).toBe("No workers");
+	});
+
+	// The one count worth colour, reported apart so the card can tint it alone.
+	it("reports work waiting on a person separately", () => {
+		const summary = projectCardSummary(rowFor([
+			session({ id: "proj-1", status: "needs_input" }),
+			session({ id: "proj-2", status: "working" }),
+		]));
+		expect(summary.needsYou).toBe(1);
+	});
+});
+
+describe("orchestratorButtonCopy", () => {
+	const rowWith = (action: "open" | "start" | "resume") => ({
+		...rowByProject(orchestratorProjectSections([project("proj")], [], [link()]), "proj"),
+		action,
+	});
+
+	it("names what the button will do", () => {
+		expect(orchestratorButtonCopy(rowWith("open"), false)).toEqual({ label: "Open orchestrator", running: true });
+		expect(orchestratorButtonCopy(rowWith("start"), false)).toEqual({ label: "Start orchestrator", running: false });
+		expect(orchestratorButtonCopy(rowWith("resume"), false)).toEqual({ label: "Resume orchestrator", running: false });
+	});
+
+	it("says it is working while a launch is in flight", () => {
+		expect(orchestratorButtonCopy(rowWith("start"), true).label).toBe("Starting…");
+		expect(orchestratorButtonCopy(rowWith("resume"), true).label).toBe("Resuming…");
+	});
+});
+
+describe("projectDetailSessions", () => {
+	// A project's own page is where its history belongs, so finished work stays.
+	it("keeps archived sessions alongside live ones", () => {
+		const sessions = [
+			session({ id: "a", projectId: "proj", status: "working" }),
+			session({ id: "b", projectId: "proj", status: "terminated", isTerminated: true }),
+			session({ id: "c", projectId: "other" }),
+		];
+		expect(projectDetailSessions("proj", sessions).map((item) => item.id)).toEqual(["a", "b"]);
 	});
 });
