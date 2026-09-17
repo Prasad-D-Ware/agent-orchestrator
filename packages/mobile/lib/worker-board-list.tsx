@@ -56,6 +56,7 @@ export function WorkerBoardList({
 	ListHeaderComponent,
 	ListEmptyComponent,
 	initialArchiveOpen = false,
+	showProject = true,
 }: {
 	sessions: DashboardSession[];
 	/** Non-empty switches the board to a single flat "Search results" section. */
@@ -67,6 +68,8 @@ export function WorkerBoardList({
 	ListHeaderComponent?: ReactElement | null;
 	ListEmptyComponent?: ReactElement | null;
 	initialArchiveOpen?: boolean;
+	/** Off on a project's own page, where every row would repeat its name; the agent shows instead. */
+	showProject?: boolean;
 }) {
 	const t = useTheme();
 	const { projects, kill, renameWorker, setWorkerPinned, restore, resumeAgent } = useApp();
@@ -215,7 +218,7 @@ export function WorkerBoardList({
 						<BoardRowTransition>
 							<WorkerListRow
 								session={session}
-								projectName={projectNames.get(session.projectId)}
+								projectName={showProject ? projectNames.get(session.projectId) : session.harness || "Agent"}
 								isRenaming={renamingWorkerId === session.id}
 								activeSwipeId={activeSwipeId}
 								onSwipeOpen={openExclusiveSwipe}
@@ -267,6 +270,6 @@ const makeStyles = (t: Theme) =>
 			paddingTop: 22,
 			paddingBottom: 10,
 		},
-		archiveLabel: { color: t.textTertiary, fontSize: 11, letterSpacing: 1.2, fontWeight: "700", flex: 1 },
+		archiveLabel: { color: t.textTertiary, fontSize: 12, lineHeight: 16, fontWeight: "500", flex: 1 },
 		archiveCount: { color: t.textFaint, fontSize: 12, fontWeight: "700", fontFamily: t.fontMono },
 	});

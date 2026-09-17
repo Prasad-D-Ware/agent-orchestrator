@@ -1,7 +1,7 @@
 // Presentation rules for the orchestrator tab. Pure — no React Native or Expo
 // imports — so the lifecycle mapping is unit-testable, the same split as
 // prView.ts / pushStatus.ts.
-import { isArchived } from "./agentsView";
+import { agentBlocked, boardZoneOf, isArchived } from "./agentsView";
 import type { DashboardSession, OrchestratorLink, ProjectInfo } from "./api";
 import { relativeTime } from "./notificationView";
 import { collectPRs, prLifecycle } from "./prView";
@@ -414,16 +414,21 @@ export function projectCardSummary(row: OrchestratorProjectRow): ProjectCardSumm
 /** What the card's orchestrator button says and does. */
 export type OrchestratorButtonCopy = {
 	label: string;
+	/** The same action in one word, for the compact pill on a project row. */
+	short: string;
 	/** Running orchestrators show their state beside the label. */
 	running: boolean;
 };
 
 export function orchestratorButtonCopy(row: OrchestratorProjectRow, busy: boolean): OrchestratorButtonCopy {
-	if (busy) return { label: row.action === "resume" ? "Resuming…" : "Starting…", running: false };
+	if (busy) {
+		const label = row.action === "resume" ? "Resuming…" : "Starting…";
+		return { label, short: label, running: false };
+	}
 	switch (row.action) {
-		case "open": return { label: "Open orchestrator", running: true };
-		case "resume": return { label: "Resume orchestrator", running: false };
-		case "start": return { label: "Start orchestrator", running: false };
+		case "open": return { label: "Open orchestrator", short: "Orchestrator", running: true };
+		case "resume": return { label: "Resume orchestrator", short: "Resume", running: false };
+		case "start": return { label: "Start orchestrator", short: "Start", running: false };
 	}
 }
 
@@ -436,4 +441,31 @@ export function orchestratorButtonCopy(row: OrchestratorProjectRow, busy: boolea
  */
 export function projectDetailSessions(projectId: string, sessions: readonly DashboardSession[]): DashboardSession[] {
 	return sessions.filter((session) => session.projectId === projectId);
+}
+
+export type ProjectPageStats = { workers: number; needsYou: number; ready: number; archived: number };
+
+/**
+ * The counts across the top of a project page. Zones come from the board's own
+ * classifier, so "Needs you" and "Ready" agree with the sections listed below.
+ * "Needs you" also counts the orchestrator when it is the one waiting — it is
+ * something to answer, even though it is not in the worker list.
+ */
+export function projectPageStats(
+	sessions: readonly DashboardSession[],
+	orchestrator?: OrchestratorLink | null,
+): ProjectPageStats {
+	const orchestratorWaiting = orchestrator && orchestrator.isTerminal !== true && agentBlocked({ status: orchestrator.status ?? null });
+	const stats: ProjectPageStats = { workers: 0, needsYou: orchestratorWaiting ? 1 : 0, ready: 0, archived: 0 };
+	for (const session of sessions) {
+		if (isArchived(session)) {
+			stats.archived += 1;
+			continue;
+		}
+		stats.workers += 1;
+		const zone = boardZoneOf(session);
+		if (zone === "needs_you") stats.needsYou += 1;
+		if (zone === "ready") stats.ready += 1;
+	}
+	return stats;
 }

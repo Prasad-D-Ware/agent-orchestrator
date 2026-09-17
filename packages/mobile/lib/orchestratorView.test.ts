@@ -12,6 +12,7 @@ import {
 	projectBlockerLine,
 	projectCardSummary,
 	projectDetailSessions,
+	projectPageStats,
 	projectRailTone,
 	projectRowChips,
 	workersOf,
@@ -455,9 +456,9 @@ describe("orchestratorButtonCopy", () => {
 	});
 
 	it("names what the button will do", () => {
-		expect(orchestratorButtonCopy(rowWith("open"), false)).toEqual({ label: "Open orchestrator", running: true });
-		expect(orchestratorButtonCopy(rowWith("start"), false)).toEqual({ label: "Start orchestrator", running: false });
-		expect(orchestratorButtonCopy(rowWith("resume"), false)).toEqual({ label: "Resume orchestrator", running: false });
+		expect(orchestratorButtonCopy(rowWith("open"), false)).toEqual({ label: "Open orchestrator", short: "Orchestrator", running: true });
+		expect(orchestratorButtonCopy(rowWith("start"), false)).toEqual({ label: "Start orchestrator", short: "Start", running: false });
+		expect(orchestratorButtonCopy(rowWith("resume"), false)).toEqual({ label: "Resume orchestrator", short: "Resume", running: false });
 	});
 
 	it("says it is working while a launch is in flight", () => {
@@ -475,5 +476,24 @@ describe("projectDetailSessions", () => {
 			session({ id: "c", projectId: "other" }),
 		];
 		expect(projectDetailSessions("proj", sessions).map((item) => item.id)).toEqual(["a", "b"]);
+	});
+});
+
+describe("projectPageStats", () => {
+	it("counts live workers by board zone and archived ones apart", () => {
+		const stats = projectPageStats([
+			session({ id: "a", status: "working" }),
+			session({ id: "b", status: "needs_input" }),
+			session({ id: "c", status: "terminated", isTerminated: true }),
+		]);
+		expect(stats.workers).toBe(2);
+		expect(stats.archived).toBe(1);
+		expect(stats.needsYou).toBe(1);
+	});
+
+	it("counts an orchestrator that is waiting on you", () => {
+		const sessions = [session({ id: "a", status: "needs_input" })];
+		expect(projectPageStats(sessions, link({ status: "needs_input" })).needsYou).toBe(2);
+		expect(projectPageStats(sessions, link({ status: "working" })).needsYou).toBe(1);
 	});
 });

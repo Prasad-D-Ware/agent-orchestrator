@@ -42,7 +42,7 @@ export const BOARD_ZONES: BoardZone[] = ["needs_you", "needs_review", "ready", "
  */
 const AGENT_BLOCKED = new Set(["needs_input", "stuck", "errored", "exited"]);
 
-function agentBlocked(session: DashboardSession): boolean {
+export function agentBlocked(session: Pick<DashboardSession, "status" | "displayStatus">): boolean {
 	return AGENT_BLOCKED.has(session.status ?? "") || session.displayStatus === "Blocked";
 }
 

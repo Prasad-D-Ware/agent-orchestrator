@@ -3,8 +3,8 @@ import { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { haptics } from "../../lib/haptics";
-import { orchestratorProjectSections, projectDetailSessions } from "../../lib/orchestratorView";
-import { ProjectOrchestratorPanel } from "../../lib/project-card";
+import { orchestratorProjectSections, projectDetailSessions, projectPageStats } from "../../lib/orchestratorView";
+import { ProjectPageHeader } from "../../lib/project-card";
 import { StaleBanner } from "../../lib/StaleBanner";
 import { useApp } from "../../lib/store";
 import type { Theme } from "../../lib/theme";
@@ -36,6 +36,7 @@ export default function ProjectScreen() {
 		[projects, sessions, orchestrators, id],
 	);
 	const projectSessions = useMemo(() => projectDetailSessions(id ?? "", sessions), [id, sessions]);
+	const stats = useMemo(() => projectPageStats(projectSessions, row?.link), [projectSessions, row?.link]);
 
 	const onRefresh = useCallback(async () => {
 		haptics.tap();
@@ -57,7 +58,15 @@ export default function ProjectScreen() {
 			<View style={{ height: insets.top }} />
 			<ScreenHeader
 				title={row?.project.name ?? "Project"}
-				left={<HeaderIconButton icon="back" label="Back" onPress={() => router.back()} />}
+				left={
+					<HeaderIconButton
+						icon="back"
+						label="Back"
+						// A deep link can open this page as the only screen in the stack, with
+						// nothing beneath it to go back to. Land on Projects instead.
+						onPress={() => (router.canGoBack() ? router.back() : router.replace("/projects"))}
+					/>
+				}
 			/>
 			<StaleBanner error={!!error} onRetry={onRefresh} />
 
@@ -72,12 +81,14 @@ export default function ProjectScreen() {
 			) : (
 				<WorkerBoardList
 					sessions={projectSessions}
+					showProject={false}
 					contentBottomInset={insets.bottom + 32}
 					refreshing={refreshing}
 					onRefresh={onRefresh}
 					ListHeaderComponent={
-						<ProjectOrchestratorPanel
+						<ProjectPageHeader
 							row={row}
+							stats={stats}
 							busy={busyProjects.has(row.project.id)}
 							onPress={openOrchestrator}
 						/>
