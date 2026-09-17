@@ -26,18 +26,19 @@ import {
 	type SessionMode,
 	type SpawnAttachmentInput,
 } from "./api";
-import { isConfigured, loadConfig, type ServerConfig } from "./config";
+import { isConfigured, loadConfig, machineIdentity, type ServerConfig } from "./config";
 import { resolveActiveConfig, runtimeResolveDeps } from "./resolveConfig";
 import { pollIntervalFor } from "./pollInterval";
 import type { Endpoint } from "./endpoints";
 import { activeHost, loadHosts } from "./hosts";
 import { shouldReRace } from "./reRace";
 import { shouldRaceForUpgrade, UPGRADE_RACE_CHECK_MS } from "./upgradeRace";
-import { sameServerConfig } from "./sameConfig";
+import { pollResultIsCurrent, sameServerConfig } from "./sameConfig";
 import { shouldShowLoading } from "./configLoading";
 import { shouldKeepPolling } from "./connectionError";
 import { primeInstallId } from "./installId";
 import { collectPRs } from "./prView";
+import { ALL_PROJECTS, NO_PROJECTS_KNOWN, projectsForMachine, resolveActiveProject, retainProjects, type KnownProjects } from "./projectFilter";
 import { MOBILE_EVENTS } from "./telemetry/events";
 import { mobileTelemetry, trackFeature } from "./telemetry/runtime";
 import { useConversationEventTransport } from "./chat/conversationEvents";
@@ -127,13 +128,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	// yet" from "no machine paired" — identical as state, opposite to the user.
 	const [configResolved, setConfigResolved] = useState(false);
 	const [activeEndpoints, setActiveEndpoints] = useState<Endpoint[]>([]);
-	const [projects, setProjects] = useState<ProjectInfo[]>([]);
-	const [projectsKnown, setProjectsKnown] = useState(false);
+	const [knownProjects, setKnownProjects] = useState<KnownProjects>(NO_PROJECTS_KNOWN);
 	const [sessions, setSessions] = useState<DashboardSession[]>([]);
 	const [orchestrators, setOrchestrators] = useState<OrchestratorLink[]>([]);
 	const [orchestratorId, setOrchestratorId] = useState<string | null>(null);
 	const [stats, setStats] = useState<DashboardStats>({});
-	const [activeProjectId, setActiveProjectId] = useState<string>("all");
+	const [chosenProjectId, setChosenProjectId] = useState<string>(ALL_PROJECTS);
 	const [connection, setConnection] = useState<ConnStatus>("closed");
 	const [notificationsUnread, setNotificationsUnread] = useState(0);
 	const [loading, setLoading] = useState(true);
@@ -194,7 +194,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	// Load persisted active project once.
 	useEffect(() => {
 		AsyncStorage.getItem(ACTIVE_PROJECT_KEY).then((v) => {
-			if (v) setActiveProjectId(v);
+			if (v) setChosenProjectId(v);
 		});
 	}, []);
 
@@ -301,8 +301,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			// getSessions returns projects, so don't fetch /projects again alongside
 			// it — that duplicate doubled the auth attempts spent per failing tick.
 			const sess = await getSessions(c, "all");
-			setProjects(sess.projects ?? []);
-			setProjectsKnown(sess.projects !== null);
+			// A poll that started against the previous pairing must not publish any
+			// of its board state after the user has moved to another machine.
+			if (!pollResultIsCurrent(c, cfgRef.current)) return false;
+			setKnownProjects((prev) => retainProjects(
+				prev,
+				{ machine: machineIdentity(c), projects: sess.projects },
+				machineIdentity(c),
+			));
 			setSessions(sess.sessions);
 			setOrchestrators(sess.orchestrators);
 			setOrchestratorId(sess.orchestratorId);
@@ -323,15 +329,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			// The app may have gone to the background while the sessions request was
 			// in flight. Stop here rather than spending another request that would
 			// re-mark this device live after the user left.
-			if (!pollActiveRef.current) return true;
+			if (!pollActiveRef.current || !pollResultIsCurrent(c, cfgRef.current)) return false;
 			try {
 				const page = await getNotifications(c, { status: "unread", limit: 1 });
+				if (!pollResultIsCurrent(c, cfgRef.current)) return false;
 				setNotificationsUnread(page.unreadCount);
 			} catch {
+				if (!pollResultIsCurrent(c, cfgRef.current)) return false;
 				setNotificationsUnread(0);
 			}
 			return true;
 		} catch (e) {
+			if (!pollResultIsCurrent(c, cfgRef.current)) return false;
 			lastTickOkRef.current = false;
 			const msg = e instanceof Error ? e.message : "Failed to load";
 			setError(msg);
@@ -351,7 +360,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			// Decided from the status, not the message text: see shouldKeepPolling.
 			return shouldKeepPolling(status);
 		} finally {
-			setLoading(false);
+			if (pollResultIsCurrent(c, cfgRef.current)) setLoading(false);
 		}
 	}, []);
 
@@ -421,13 +430,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	}, [config, fetchAll, appActive, reloadConfig, configResolved]);
 
 	const setActiveProject = useCallback((id: string) => {
-		setActiveProjectId(id);
+		setChosenProjectId(id);
 		AsyncStorage.setItem(ACTIVE_PROJECT_KEY, id).catch(() => {});
 	}, []);
 
+	// During a re-pair, the previous machine's retained list is not evidence
+	// about the new machine. Keep it hidden until the active machine answers.
+	const { projects, known: projectsKnown } = projectsForMachine(
+		knownProjects,
+		config && isConfigured(config) ? machineIdentity(config) : "",
+	);
+	const activeProjectId = useMemo(
+		() => resolveActiveProject(chosenProjectId, projects, projectsKnown),
+		[chosenProjectId, projects, projectsKnown],
+	);
+
 	// Pick a sensible project for actions that need one (spawn / conductor).
 	const targetProject = useCallback((): string | null => {
-		if (activeProjectId !== "all") return activeProjectId;
+		if (activeProjectId !== ALL_PROJECTS) return activeProjectId;
 		if (projects.length === 1) return projects[0].id;
 		return null;
 	}, [activeProjectId, projects]);

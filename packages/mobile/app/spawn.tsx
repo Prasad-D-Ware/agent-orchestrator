@@ -22,6 +22,7 @@ import { classifyConnectionFailure, describeConnectionFailure } from "../lib/con
 import { chatErrorCopy, isChatPreflightError } from "../lib/chatError";
 import { haptics } from "../lib/haptics";
 import { keyboardOverlap } from "../lib/worker-dock-layout";
+import { resolveSpawnProject } from "../lib/projectFilter";
 import { modelOverride, resolveSpawnAgent, resolveSpawnModel, spawnModelSourceChanged } from "../lib/spawnModel";
 import { appendSpawnAttachments, type SpawnAttachment } from "../lib/spawn-attachments";
 import { SpawnComposerControls } from "../lib/spawn-composer-controls";
@@ -37,7 +38,7 @@ export default function SpawnModal() {
 	const router = useRouter();
 	const { height: windowHeight } = useWindowDimensions();
 	const { projectId: routeProjectId } = useLocalSearchParams<{ projectId?: string }>();
-	const { projects, activeProjectId, config, spawn } = useApp();
+	const { projects, projectsKnown, activeProjectId, config, spawn } = useApp();
 
 	const [projectId, setProjectId] = useState<string | null>(null);
 	const [harness, setHarness] = useState("");
@@ -92,11 +93,15 @@ export default function SpawnModal() {
 	// `targetProject()`; kept here because the screen needs it as UI state to
 	// drive the picker's value and the button's disabled state.
 	useEffect(() => {
-		if (projectId) return;
-		if (routeProjectId && projects.some((project) => project.id === routeProjectId)) setProjectId(routeProjectId);
-		else if (activeProjectId !== "all") setProjectId(activeProjectId);
-		else if (projects.length === 1) setProjectId(projects[0].id);
-	}, [activeProjectId, projects, projectId, routeProjectId]);
+		const nextProjectId = resolveSpawnProject(
+			projectId,
+			routeProjectId,
+			activeProjectId,
+			projects,
+			projectsKnown,
+		);
+		if (nextProjectId !== projectId) changeProject(nextProjectId);
+	}, [activeProjectId, projects, projectsKnown, projectId, routeProjectId]);
 
 	useEffect(() => {
 		if (!config) return;
@@ -178,7 +183,7 @@ export default function SpawnModal() {
 
 	const clearModelOverride = () => { setModel(""); setModelTouched(false); };
 	const resetModelSource = () => { clearModelOverride(); setModelCatalog(undefined); setModelError(undefined); };
-	const selectProject = (nextProjectId: string) => {
+	const changeProject = (nextProjectId: string | null) => {
 		if (!spawnModelSourceChanged({ projectId, agentId: harness }, { projectId: nextProjectId, agentId: harness })) return;
 		resetModelSource();
 		setProjectDetail(undefined);
@@ -322,7 +327,7 @@ export default function SpawnModal() {
 				<SpawnComposerControls
 					projects={projects.map((item) => ({ id: item.id, label: item.name }))}
 					projectId={project?.id ?? null}
-					onSelectProject={selectProject}
+					onSelectProject={changeProject}
 					agents={agents.filter((item) => item.selectable).map((item) => ({ id: item.id, label: item.label }))}
 					harness={harness}
 					onSelectHarness={selectAgent}
