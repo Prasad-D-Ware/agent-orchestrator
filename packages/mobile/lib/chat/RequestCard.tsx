@@ -226,7 +226,7 @@ export function RequestCard({
 							onPress={sendTyped}
 							style={({ pressed }) => [styles.send, pressed && styles.pressed]}
 						>
-							{busy ? <ActivityIndicator size="small" color={t.onAccent} /> : <Feather name="arrow-up" size={16} color={t.onAccent} />}
+							{busy ? <ActivityIndicator size="small" color={t.bgBase} /> : <Feather name="arrow-up" size={16} color={t.bgBase} />}
 						</Pressable> : null}
 					</View> : null}
 				</Animated.View>
@@ -270,7 +270,7 @@ const makeStyles = (t: Theme) =>
 		optionHint: { color: t.textTertiary, fontSize: 12, lineHeight: 16 },
 		typed: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 6 },
 		typedInput: { flex: 1, minHeight: 38, color: t.textPrimary, fontSize: 15, paddingVertical: 8 },
-		send: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: t.blue },
+		send: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: t.textPrimary },
 		skip: { paddingVertical: 2, paddingHorizontal: 2 },
 		skipText: { color: t.textSecondary, fontSize: 13, fontWeight: "600" },
 		openForm: { flexDirection: "row", alignItems: "center", gap: 7, paddingVertical: 10 },
