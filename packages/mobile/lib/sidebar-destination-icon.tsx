@@ -1,4 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { NotificationTypeIcon } from "./notification-type-icon";
+import { WorkersIcon } from "./workers-icon";
 import type { SidebarDestination, SidebarDestinationId } from "./sidebar-navigation";
 
 /**
@@ -10,10 +12,8 @@ import type { SidebarDestination, SidebarDestinationId } from "./sidebar-navigat
  * Desktop has no equivalent nav item to copy, so this follows the product's own
  * language: a worker is an agent doing the work.
  */
-const glyphs: Record<SidebarDestinationId, { idle: keyof typeof MaterialCommunityIcons.glyphMap; active: keyof typeof MaterialCommunityIcons.glyphMap }> = {
+const glyphs: Record<Exclude<SidebarDestinationId, "prs" | "agents">, { idle: keyof typeof MaterialCommunityIcons.glyphMap; active: keyof typeof MaterialCommunityIcons.glyphMap }> = {
 	projects: { idle: "folder-outline", active: "folder-open" },
-	agents: { idle: "robot-outline", active: "robot" },
-	prs: { idle: "source-pull", active: "source-pull" },
 	settings: { idle: "cog-outline", active: "cog" },
 };
 
@@ -26,6 +26,10 @@ export function SidebarDestinationIcon({
 	color: string;
 	active?: boolean;
 }) {
+	// Pull requests draw the renderer's own lucide glyph, shared with the
+	// notifications and the PR page.
+	if (destination.id === "agents") return <WorkersIcon size={20} color={color} />;
+	if (destination.id === "prs") return <NotificationTypeIcon icon="git-pull-request-arrow" size={20} color={color} />;
 	const glyph = glyphs[destination.id];
 	// No RNHostView here: this path is Android's, and hosting a vector-icon glyph
 	// inside a Compose view renders nothing at all.
