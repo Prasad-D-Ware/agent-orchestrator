@@ -30,7 +30,6 @@ const SHEET_ROUTES = [
 	{ name: "sheets/conversation-actions", detents: [0.6, 0.95] },
 	{ name: "sheets/conversation-rename", detents: [0.35, 0.65] },
 	{ name: "sheets/composer-picker", detents: [0.6, 0.95] },
-	{ name: "sheets/theme", detents: "fitToContents" },
 	{ name: "sheets/store-update", detents: "fitToContents" },
 ] as const;
 
@@ -127,7 +126,11 @@ function Shell() {
 						presentation: Platform.OS === "ios" ? "formSheet" : "transparentModal",
 						headerShown: false,
 						sheetAllowedDetents: Platform.OS === "ios" ? [0.5, 0.9] : undefined,
-						sheetInitialDetentIndex: 0,
+						// Opens tall on iOS. At the half detent the keyboard is taller
+						// than the sheet, so the selectors and Start task had nowhere to
+						// go and ended up clipped beneath it; dragging down to half is
+						// still there for anyone who wants the board behind it.
+						sheetInitialDetentIndex: Platform.OS === "ios" ? 1 : 0,
 						sheetGrabberVisible: Platform.OS === "ios",
 						sheetCornerRadius: 24,
 						contentStyle: { backgroundColor: Platform.OS === "ios" ? t.bgSurface : "transparent" },

@@ -13,7 +13,7 @@ import {
 	Text,
 	View,
 } from "react-native";
-import { useKeyboardState } from "react-native-keyboard-controller";
+import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { agentErrorCopy } from "../lib/agentError";
 import { defaultAgent, rankAgents } from "../lib/agentPicker";
 import { ApiError, getAgentModels, getAgents, getProject, getSettings, type AgentCatalog, type AgentModelCatalog, type ProjectDetail, type SessionMode } from "../lib/api";
@@ -60,20 +60,7 @@ export default function SpawnModal() {
 	const [loading, setLoading] = useState(true);
 	const [offerTUI, setOfferTUI] = useState(false);
 
-	// Deliberately useKeyboardState, not useKeyboardAnimation.
-	//
-	// useKeyboardAnimation().height is built as `Animated.multiply(height, -1)` —
-	// it is negative on purpose, so `transform: [{ translateY: height }]` lifts a
-	// view. Feeding that to `paddingBottom` applies no padding at all, which let
-	// the keyboard cover the project/model selectors and the Spawn button.
-	//
-	// This screen pads rather than translates, so it wants the plain positive
-	// height — the same value the Workers board and the chat screen use.
-	//
-	// Only the iOS sheet consumes it: the native Android form sheet resizes itself
-	// for the IME, and adding the height a second time pushed the selector rail
-	// below the sheet.
-	const keyboardHeight = useKeyboardState((state) => state.height);
+
 
 	// Seed from the active project, or the only project. Mirrors the store's
 	// `targetProject()`; kept here because the screen needs it as UI state to
@@ -310,6 +297,15 @@ export default function SpawnModal() {
 					{offerTUI ? <Button title="Create as Terminal UI instead" variant="ghost" icon="terminal" onPress={() => { selectMode("tui"); setOfferTUI(false); setError(null); }} /> : null}
 				</View> : null}
 
+				{/* The controls ride the keyboard on the UI thread.
+				    iOS does not lift this form sheet for the IME, and every
+				    height-based attempt moved late or not at all: a settled keyboard
+				    height only lands after the animation, animated padding is
+				    interpolated on the JS thread, and a keyboard-avoiding wrapper
+				    mismeasures its own frame inside a sheet, leaving Start task behind
+				    the keyboard. A sticky view translates by the live offset, so
+				    the selectors and the button sit directly above it. */}
+				<KeyboardStickyView offset={{ closed: 0, opened: 0 }}>
 				<SpawnComposerControls
 					projects={projects.map((item) => ({ id: item.id, label: item.name }))}
 					projectId={project?.id ?? null}
@@ -326,6 +322,7 @@ export default function SpawnModal() {
 					busy={busy}
 					disabled={!projectId || !harness || busy || modelLoading || loading}
 				/>
+				</KeyboardStickyView>
 		</View>
 	);
 
@@ -347,7 +344,7 @@ export default function SpawnModal() {
 		);
 	}
 
-	return <View style={[styles.screen, { paddingBottom: keyboardHeight }]}>{content}</View>;
+	return <View style={styles.screen}>{content}</View>;
 }
 
 // Human copy for a failed spawn, matching every other screen. This one used to
