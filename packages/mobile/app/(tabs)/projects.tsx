@@ -15,6 +15,8 @@ import { useOrchestratorLauncher } from "../../lib/useOrchestratorLauncher";
 import { useTabScrollToTop } from "../../lib/useTabScrollToTop";
 import { Button, EmptyState, HeaderIconButton, ListSectionHeader, ScreenHeader } from "../../lib/ui";
 
+export { RouteErrorBoundary as ErrorBoundary } from "../../lib/RouteErrorBoundary";
+
 export default function ProjectsScreen() {
 	const t = useTheme();
 	const styles = useThemedStyles(makeStyles);

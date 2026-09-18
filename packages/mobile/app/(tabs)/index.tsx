@@ -25,6 +25,8 @@ import {
 	workerSearchPresentation,
 } from "../../lib/worker-controls";
 
+export { RouteErrorBoundary as ErrorBoundary } from "../../lib/RouteErrorBoundary";
+
 export default function FleetScreen() {
 	const t = useTheme();
 	const styles = useThemedStyles(makeStyles);

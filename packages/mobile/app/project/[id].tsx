@@ -13,6 +13,8 @@ import { useOrchestratorLauncher } from "../../lib/useOrchestratorLauncher";
 import { Button, EmptyState, HeaderIconButton, ListSectionHeader, ScreenHeader } from "../../lib/ui";
 import { WorkerBoardList } from "../../lib/worker-board-list";
 
+export { RouteErrorBoundary as ErrorBoundary } from "../../lib/RouteErrorBoundary";
+
 /**
  * One project: its orchestrator on top, and below it that project's workers
  * exactly as the Workers board shows them — same sections, same row actions,

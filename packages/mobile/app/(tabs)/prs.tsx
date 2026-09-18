@@ -17,6 +17,8 @@ import { useTabScrollToTop } from "../../lib/useTabScrollToTop";
 import { Button, EmptyState, HeaderIconButton, ListSectionHeader, ScreenHeader } from "../../lib/ui";
 import { useTheme, useThemedStyles } from "../../lib/ThemeProvider";
 
+export { RouteErrorBoundary as ErrorBoundary } from "../../lib/RouteErrorBoundary";
+
 type Filter = PRListFilter;
 
 // Drafts are open PRs — they belong in the Open bucket even though the card

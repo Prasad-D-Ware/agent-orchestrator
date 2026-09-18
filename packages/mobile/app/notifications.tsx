@@ -32,6 +32,8 @@ import type { Theme } from "../lib/theme";
 import { useTheme, useThemedStyles } from "../lib/ThemeProvider";
 import { Dot, EmptyState, HeaderIconButton, ScreenHeader } from "../lib/ui";
 
+export { RouteErrorBoundary as ErrorBoundary } from "../lib/RouteErrorBoundary";
+
 const PAGE_SIZE = 50;
 
 // The durable record of what the daemon has notified about. Push only reaches a

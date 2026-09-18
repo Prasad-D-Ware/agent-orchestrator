@@ -30,6 +30,8 @@ import type { Theme } from "../lib/theme";
 import { useTheme, useThemedStyles } from "../lib/ThemeProvider";
 import { Button } from "../lib/ui";
 
+export { SheetErrorBoundary as ErrorBoundary } from "../lib/RouteErrorBoundary";
+
 export default function SpawnModal() {
 	const t = useTheme();
 	const styles = useThemedStyles(makeStyles);
