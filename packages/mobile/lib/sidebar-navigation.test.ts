@@ -103,9 +103,16 @@ describe("sidebar navigation", () => {
 		expect(calls).toEqual([{ y: 0, animated: true }]);
 	});
 
-	it("scrolls a section list to its first item when its active item is reselected", () => {
+	it("scrolls an empty section list through its responder instead of addressing a missing item", () => {
 		const calls: unknown[] = [];
-		scrollSidebarRefToTop({ scrollToLocation: (options: unknown) => calls.push(options) });
-		expect(calls).toEqual([{ sectionIndex: 0, itemIndex: 0, viewOffset: 0, animated: true }]);
+		const emptySectionList = {
+			getScrollResponder: () => ({ scrollTo: (options: unknown) => calls.push(options) }),
+			scrollToLocation: () => {
+				throw new Error("scrollToIndex out of range: item length 0 but minimum is 1");
+			},
+		};
+
+		expect(() => scrollSidebarRefToTop(emptySectionList)).not.toThrow();
+		expect(calls).toEqual([{ y: 0, animated: true }]);
 	});
 });

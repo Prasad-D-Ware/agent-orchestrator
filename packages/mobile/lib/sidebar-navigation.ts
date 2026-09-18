@@ -53,18 +53,17 @@ export function sidebarNavigationSettled(pendingPath: string | null, pathname: s
 
 type ScrollableSidebarRef = {
 	scrollTo?: (options: { y: number; animated: boolean }) => void;
-	scrollToLocation?: (options: {
-		sectionIndex: number;
-		itemIndex: number;
-		viewOffset: number;
-		animated: boolean;
-	}) => void;
+	getScrollResponder?: () => {
+		scrollTo?: (options: { y: number; animated: boolean }) => void;
+	} | null | undefined;
 };
 
 export function scrollSidebarRefToTop(ref: ScrollableSidebarRef | null | undefined) {
-	if (ref?.scrollToLocation) {
-		ref.scrollToLocation({ sectionIndex: 0, itemIndex: 0, viewOffset: 0, animated: true });
+	if (ref?.scrollTo) {
+		ref.scrollTo({ y: 0, animated: true });
 		return;
 	}
-	ref?.scrollTo?.({ y: 0, animated: true });
+	if (ref?.getScrollResponder) {
+		ref.getScrollResponder()?.scrollTo?.({ y: 0, animated: true });
+	}
 }
